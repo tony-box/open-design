@@ -67,6 +67,7 @@ export const copilotAgentDef = {
     },
     promptViaStdin: true,
     streamFormat: 'copilot-stream-json',
+    connectionTestTimeoutMs: 120_000,
     // GitHub Copilot's deck-generation and large-prompt turns go silent
     // (no stdout, no streamed events) for stretches that exceed the
     // 10-minute global default — the model is still working but the
