@@ -346,7 +346,7 @@ export const ptBR: Dict = {
   'settings.onboardingGateTooltipNoRuntime': 'As próximas etapas rodam em IA — escolha um runtime para continuar.',
   'settings.onboardingGateTooltipAmr': 'As próximas etapas rodam em IA — faça login no OpenDesign Cloud para continuar.',
   'settings.onboardingGateTooltipLocal': 'As próximas etapas rodam em IA — selecione uma CLI local disponível para continuar.',
-  'settings.onboardingGateTooltipByok': 'As próximas etapas rodam em IA — adicione e teste sua chave de modelo para continuar.',
+  'settings.onboardingGateTooltipByok': 'As próximas etapas rodam em IA — preencha os dados da chave do modelo para continuar.',
   'settings.onboardingRecommended': 'Recomendado',
   'settings.onboardingAmrCloudOfficialBadge': 'Oficial',
   'settings.onboardingLocalTitle': 'Agente local',

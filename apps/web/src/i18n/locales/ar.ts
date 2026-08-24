@@ -346,7 +346,7 @@ export const ar: Dict = {
   'settings.onboardingGateTooltipNoRuntime': 'الخطوات التالية تعمل بالذكاء الاصطناعي — اختر طريقة تشغيل للمتابعة.',
   'settings.onboardingGateTooltipAmr': 'الخطوات التالية تعمل بالذكاء الاصطناعي — سجّل الدخول إلى OpenDesign Cloud للمتابعة.',
   'settings.onboardingGateTooltipLocal': 'الخطوات التالية تعمل بالذكاء الاصطناعي — اختر CLI محليًا متاحًا للمتابعة.',
-  'settings.onboardingGateTooltipByok': 'الخطوات التالية تعمل بالذكاء الاصطناعي — أضف مفتاح النموذج واختبره للمتابعة.',
+  'settings.onboardingGateTooltipByok': 'الخطوات التالية تعمل بالذكاء الاصطناعي — أضف تفاصيل مفتاح النموذج للمتابعة.',
   'settings.onboardingRecommended': 'موصى به',
   'settings.onboardingAmrCloudOfficialBadge': 'رسمي',
   'settings.onboardingLocalTitle': 'وكيل محلي',

@@ -331,7 +331,7 @@ export const zhTW: Dict = {
   "settings.onboardingGateTooltipLocal":
     "後續流程由 AI 執行，請先選擇一個可用的本機 CLI。",
   "settings.onboardingGateTooltipByok":
-    "後續流程由 AI 執行，請先填寫並測試通過你的模型 Key。",
+    "後續流程由 AI 執行，請先填寫你的模型 Key 資訊。",
   "settings.onboardingRecommended": "推薦",
   "settings.onboardingAmrCloudOfficialBadge": "官方",
   "settings.onboardingLocalTitle": "本機 Agent",

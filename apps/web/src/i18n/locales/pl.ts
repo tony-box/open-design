@@ -346,7 +346,7 @@ export const pl: Dict = {
   'settings.onboardingGateTooltipNoRuntime': 'Kolejne kroki działają na AI — wybierz środowisko uruchomieniowe, aby kontynuować.',
   'settings.onboardingGateTooltipAmr': 'Kolejne kroki działają na AI — zaloguj się do OpenDesign Cloud, aby kontynuować.',
   'settings.onboardingGateTooltipLocal': 'Kolejne kroki działają na AI — wybierz dostępne lokalne CLI, aby kontynuować.',
-  'settings.onboardingGateTooltipByok': 'Kolejne kroki działają na AI — dodaj i przetestuj swój klucz modelu, aby kontynuować.',
+  'settings.onboardingGateTooltipByok': 'Kolejne kroki działają na AI — uzupełnij dane klucza modelu, aby kontynuować.',
   'settings.onboardingRecommended': 'Polecane',
   'settings.onboardingAmrCloudOfficialBadge': 'Oficjalne',
   'settings.onboardingLocalTitle': 'Agent lokalny',

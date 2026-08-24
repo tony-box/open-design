@@ -346,7 +346,7 @@ export const hu: Dict = {
   'settings.onboardingGateTooltipNoRuntime': 'A következő lépések MI-n futnak — válassz futtatókörnyezetet a folytatáshoz.',
   'settings.onboardingGateTooltipAmr': 'A következő lépések MI-n futnak — jelentkezz be az OpenDesign Cloud-be a folytatáshoz.',
   'settings.onboardingGateTooltipLocal': 'A következő lépések MI-n futnak — válassz egy elérhető helyi CLI-t a folytatáshoz.',
-  'settings.onboardingGateTooltipByok': 'A következő lépések MI-n futnak — add meg és teszteld a modellkulcsodat a folytatáshoz.',
+  'settings.onboardingGateTooltipByok': 'A következő lépések MI-n futnak — add meg a modellkulcs adatait a folytatáshoz.',
   'settings.onboardingRecommended': 'Ajánlott',
   'settings.onboardingAmrCloudOfficialBadge': 'Hivatalos',
   'settings.onboardingLocalTitle': 'Helyi ügynök',

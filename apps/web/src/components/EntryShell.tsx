@@ -282,7 +282,6 @@ type OnboardingAgentTestState =
 // `pluginId` is on the request body — plan §3.3 of
 // `specs/current/plugin-driven-flow-plan.md`.
 const ONBOARDING_BYOK_AUTO_FETCH_DELAY_MS = 300;
-const ONBOARDING_BYOK_AUTO_TEST_DELAY_MS = 500;
 
 type EntryCreateProjectInput = Omit<CreateInput, 'metadata'> & {
   metadata?: CreateInput['metadata'];
@@ -2149,7 +2148,6 @@ function OnboardingView({
   const amrLoginCancelRequestedRef = useRef(false);
   const amrAuthAttemptIdRef = useRef<string | null>(null);
   const providerModelsAutoFetchKeyRef = useRef<string | null>(null);
-  const providerAutoTestKeyRef = useRef<string | null>(null);
   const providerModelAutoSelectRef = useRef({
     model: config.model,
     providerModelsInputKey: '',
@@ -2232,26 +2230,7 @@ function OnboardingView({
   const connectStepRuntimeReady =
     (runtime === 'local' && localRuntimeConfigured) ||
     (runtime === 'byok' && byokRuntimeConfigured);
-  const connectStepTestRunning =
-    (runtime === 'local' && visibleAgentTestState.status === 'running') ||
-    (runtime === 'byok' && visibleProviderTestState.status === 'running');
   const connectStepBlocked = runtimeSetupStep && !connectStepRuntimeReady;
-  // What the user is looking at RIGHT NOW. `handlePrimaryAction` awaits a
-  // validation round trip before it persists anything, and its closure is
-  // frozen at click time — so the continuation cannot ask this question of its
-  // own variables. See `continueAttemptStillCurrent`.
-  const onboardingIntentRef = useRef({
-    step,
-    runtime,
-    agentTestInputKey,
-    providerTestInputKey,
-  });
-  onboardingIntentRef.current = {
-    step,
-    runtime,
-    agentTestInputKey,
-    providerTestInputKey,
-  };
   const connectGateReason: 'no_runtime' | 'local_agent_unavailable' | 'byok_unverified' | null =
     !runtimeSetupStep
       ? null
@@ -2734,41 +2713,9 @@ function OnboardingView({
     continueWithModelSource(source);
   }
 
-  /**
-   * Whether the Continue attempt that started against `startedInputKey` still
-   * describes what the user is looking at.
-   *
-   * A validation round trip can outlive the intent that started it: Back stays
-   * enabled while the test is in flight, and the inputs being validated stay
-   * editable. Persisting a late result regardless would write a configuration
-   * the user already walked away from and finish onboarding under them — so
-   * the attempt must still be on the runtime setup step, on the same runtime,
-   * and against the same inputs it validated.
-   *
-   * `inputKey` already guards what gets DISPLAYED (`visibleAgentTestState` /
-   * `visibleProviderTestState` fall back to idle once it drifts); this applies
-   * the same rule to what gets PERSISTED.
-   */
-  function continueAttemptStillCurrent(
-    startedRuntime: 'local' | 'byok',
-    startedInputKey: string,
-  ): boolean {
-    const now = onboardingIntentRef.current;
-    if (now.step !== 2 || now.runtime !== startedRuntime) return false;
-    return startedRuntime === 'local'
-      ? now.agentTestInputKey === startedInputKey
-      : now.providerTestInputKey === startedInputKey;
-  }
   async function handlePrimaryAction() {
-    if (connectStepBlocked || connectStepTestRunning) return;
+    if (connectStepBlocked) return;
     if (runtime === 'local' && selectedAgent) {
-      const startedInputKey = agentTestInputKey;
-      const testResult =
-        visibleAgentTestState.status === 'done' && visibleAgentTestState.result.ok
-          ? visibleAgentTestState.result
-          : await testAgentInline();
-      if (!testResult?.ok) return;
-      if (!continueAttemptStillCurrent('local', startedInputKey)) return;
       await onConfigPersist({
         ...config,
         mode: 'daemon',
@@ -2779,13 +2726,6 @@ function OnboardingView({
       return;
     }
     if (runtime === 'byok') {
-      const startedInputKey = providerTestInputKey;
-      const testResult =
-        visibleProviderTestState.status === 'done' && visibleProviderTestState.result.ok
-          ? visibleProviderTestState.result
-          : await testProviderInline();
-      if (!testResult?.ok) return;
-      if (!continueAttemptStillCurrent('byok', startedInputKey)) return;
       await onConfigPersist({ ...config, mode: 'api' });
       emitOnboardingClick('continue', 'continue', { runtime_type: 'byok' });
       completeStreamlinedOnboarding('byok');
@@ -3129,7 +3069,6 @@ function OnboardingView({
   async function testProviderInline(): Promise<ConnectionTestResponse | null> {
     if (!canTestProvider || providerTestState.status === 'running') return null;
     const inputKey = providerTestInputKey;
-    providerAutoTestKeyRef.current = inputKey;
     setProviderTestState({ status: 'running', inputKey });
     try {
       const result = await testApiProvider({
@@ -3290,23 +3229,6 @@ function OnboardingView({
     canFetchProviderModels,
     providerModelsInputKey,
     providerModelsState.status,
-    runtime,
-    step,
-  ]);
-
-  useEffect(() => {
-    if (runtime !== 'byok' || !runtimeSetupStep) return;
-    if (!canTestProvider) return;
-    if (providerTestState.status === 'running') return;
-    if (providerAutoTestKeyRef.current === providerTestInputKey) return;
-    const timer = window.setTimeout(() => {
-      void testProviderInline();
-    }, ONBOARDING_BYOK_AUTO_TEST_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, [
-    canTestProvider,
-    providerTestInputKey,
-    providerTestState.status,
     runtime,
     step,
   ]);
@@ -3694,7 +3616,7 @@ function OnboardingView({
               type="button"
               className={`onboarding-view__primary${connectGateTooltip ? ' od-tooltip' : ''}`}
               onClick={handlePrimaryAction}
-              disabled={amrLoginPending || amrLoginCancelPending || connectStepTestRunning}
+              disabled={amrLoginPending || amrLoginCancelPending}
               aria-disabled={connectStepBlocked || undefined}
               data-tooltip={connectGateTooltip ?? undefined}
               data-tooltip-placement="top"

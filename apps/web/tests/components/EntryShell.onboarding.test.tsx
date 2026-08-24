@@ -936,7 +936,7 @@ describe('EntryShell onboarding OpenDesign AMR runtime', () => {
     expect(props.onAgentChange).not.toHaveBeenCalled();
   });
 
-  it('tests Local Agent on Continue, stays on failure, and retries on the next click', async () => {
+  it('configures Local Agent while an optional connection test is still pending', async () => {
     let testCalls = 0;
     const fetchMock = vi.fn(async (input, init) => {
       const url = String(input);
@@ -950,23 +950,7 @@ describe('EntryShell onboarding OpenDesign AMR runtime', () => {
       }
       if (url.endsWith('/api/test/connection') && init?.method === 'POST') {
         testCalls += 1;
-        return testCalls === 1
-          ? jsonResponse({
-              ok: false,
-              kind: 'agent_spawn_failed',
-              latencyMs: 12,
-              model: 'sonnet',
-              agentName: 'Claude Code',
-              detail: 'process exited before responding',
-            })
-          : jsonResponse({
-              ok: true,
-              kind: 'success',
-              latencyMs: 12,
-              model: 'sonnet',
-              sample: 'pong',
-              agentName: 'Claude Code',
-            });
+        return new Promise<Response>(() => {});
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
@@ -982,15 +966,14 @@ describe('EntryShell onboarding OpenDesign AMR runtime', () => {
     const continueButton = screen.getByRole('button', { name: /^Continue$/i });
     expect(continueButton.getAttribute('aria-disabled')).toBeNull();
 
-    fireEvent.click(continueButton);
-    expect(await screen.findByText(/Could not start Claude Code/i)).toBeTruthy();
-    expect(props.onCompleteOnboarding).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /^Test$/i }));
+    await waitFor(() => expect(testCalls).toBe(1));
 
     fireEvent.click(continueButton);
     await waitFor(() => {
-      expect(testCalls).toBe(2);
       expect(props.onCompleteOnboarding).toHaveBeenCalledTimes(1);
     });
+    expect(testCalls).toBe(1);
     expect(props.onConfigPersist).toHaveBeenCalledWith(
       expect.objectContaining({ mode: 'daemon', agentId: 'claude-code' }),
     );
@@ -1002,9 +985,8 @@ describe('EntryShell onboarding OpenDesign AMR runtime', () => {
   });
 
   it('drops a Local Agent validation that lands after the user goes Back', async () => {
-    // Continue awaits a network round trip before it persists. Back stays
-    // enabled through that wait, so a late success must not resurrect the
-    // configuration the user just walked away from.
+    // Test is advisory and Back stays enabled while it runs. A late result
+    // must not alter the model-source chooser the user returned to.
     let releaseTest: ((value: Response) => void) | undefined;
     let testCalls = 0;
     globalThis.fetch = vi.fn(async (input, init) => {
@@ -1033,7 +1015,7 @@ describe('EntryShell onboarding OpenDesign AMR runtime', () => {
     });
 
     await openLocalRuntimeSetup();
-    fireEvent.click(screen.getByRole('button', { name: /^Continue$/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^Test$/i }));
     await waitFor(() => {
       expect(testCalls).toBe(1);
     });
@@ -1693,7 +1675,7 @@ describe('EntryShell onboarding OpenDesign AMR runtime', () => {
     expect(props.onApiModelChange).not.toHaveBeenCalledWith('upstream-first');
   });
 
-  it('tests BYOK on Continue, stays on rate limit, and retries on the next click', async () => {
+  it('configures BYOK while an optional connection test is still pending', async () => {
     let testCalls = 0;
     globalThis.fetch = vi.fn(async (input, init) => {
       const url = String(input);
@@ -1715,21 +1697,7 @@ describe('EntryShell onboarding OpenDesign AMR runtime', () => {
       }
       if (url.endsWith('/api/test/connection') && init?.method === 'POST') {
         testCalls += 1;
-        return testCalls === 1
-          ? jsonResponse({
-              ok: false,
-              kind: 'rate_limited',
-              latencyMs: 12,
-              model: 'gpt-test',
-              status: 429,
-            })
-          : jsonResponse({
-              ok: true,
-              kind: 'success',
-              latencyMs: 12,
-              model: 'gpt-test',
-              sample: 'Connected',
-            });
+        return new Promise<Response>(() => {});
       }
       throw new Error(`unexpected fetch: ${url}`);
     }) as typeof fetch;
@@ -1748,15 +1716,22 @@ describe('EntryShell onboarding OpenDesign AMR runtime', () => {
     const continueButton = screen.getByRole('button', { name: /^Continue$/i });
     expect(continueButton.getAttribute('aria-disabled')).toBeNull();
 
-    fireEvent.click(continueButton);
-    expect(await screen.findByText(/rate-limited the test/i)).toBeTruthy();
-    expect(props.onCompleteOnboarding).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /^Test$/i }));
+    await waitFor(() => expect(testCalls).toBe(1));
 
     fireEvent.click(continueButton);
     await waitFor(() => {
-      expect(testCalls).toBe(2);
       expect(props.onCompleteOnboarding).toHaveBeenCalledTimes(1);
     });
+    expect(testCalls).toBe(1);
+    expect(props.onConfigPersist).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'api',
+        apiKey: 'test-api-key',
+        baseUrl: 'https://api.openai.com/v1',
+        model: 'gpt-test',
+      }),
+    );
   });
 
   it('drops a BYOK validation that lands after its inputs changed', async () => {
@@ -1802,7 +1777,7 @@ describe('EntryShell onboarding OpenDesign AMR runtime', () => {
     });
 
     await openByokRuntimeSetup();
-    fireEvent.click(screen.getByRole('button', { name: /^Continue$/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^Test$/i }));
     await waitFor(() => {
       expect(testCalls).toBe(1);
     });
@@ -1826,6 +1801,7 @@ describe('EntryShell onboarding OpenDesign AMR runtime', () => {
 
     expect(props.onCompleteOnboarding).not.toHaveBeenCalled();
     expect(screen.getByRole('heading', { name: 'Bring Your Own Key' })).toBeTruthy();
+    expect(screen.queryByText(/Connected\. Replied/i)).toBeNull();
   });
 
   it('persists the BYOK config before finishing onboarding', async () => {

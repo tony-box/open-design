@@ -346,7 +346,7 @@ export const id: Dict = {
   'settings.onboardingGateTooltipNoRuntime': 'Langkah berikutnya berjalan dengan AI — pilih runtime untuk melanjutkan.',
   'settings.onboardingGateTooltipAmr': 'Langkah berikutnya berjalan dengan AI — masuk ke OpenDesign Cloud untuk melanjutkan.',
   'settings.onboardingGateTooltipLocal': 'Langkah berikutnya berjalan dengan AI — pilih CLI lokal yang tersedia untuk melanjutkan.',
-  'settings.onboardingGateTooltipByok': 'Langkah berikutnya berjalan dengan AI — tambahkan dan uji kunci model Anda untuk melanjutkan.',
+  'settings.onboardingGateTooltipByok': 'Langkah berikutnya berjalan dengan AI — lengkapi detail kunci model Anda untuk melanjutkan.',
   'settings.onboardingRecommended': 'Direkomendasikan',
   'settings.onboardingAmrCloudOfficialBadge': 'Resmi',
   'settings.onboardingLocalTitle': 'Agen lokal',

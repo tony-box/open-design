@@ -346,7 +346,7 @@ export const tr: Dict = {
   'settings.onboardingGateTooltipNoRuntime': 'Sonraki adımlar yapay zekâ ile çalışır — devam etmek için bir çalışma yöntemi seçin.',
   'settings.onboardingGateTooltipAmr': 'Sonraki adımlar yapay zekâ ile çalışır — devam etmek için OpenDesign Cloud’ye giriş yapın.',
   'settings.onboardingGateTooltipLocal': 'Sonraki adımlar yapay zekâ ile çalışır — devam etmek için kullanılabilir bir yerel CLI seçin.',
-  'settings.onboardingGateTooltipByok': 'Sonraki adımlar yapay zekâ ile çalışır — devam etmek için model anahtarınızı ekleyip test edin.',
+  'settings.onboardingGateTooltipByok': 'Sonraki adımlar yapay zekâ ile çalışır — devam etmek için model anahtarı bilgilerinizi tamamlayın.',
   'settings.onboardingRecommended': 'Önerilen',
   'settings.onboardingAmrCloudOfficialBadge': 'Resmi',
   'settings.onboardingLocalTitle': 'Yerel ajan',

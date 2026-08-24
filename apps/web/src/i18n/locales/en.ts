@@ -346,7 +346,7 @@ export const en: Dict = {
   'settings.onboardingGateTooltipNoRuntime': 'The next steps run on AI — pick a runtime to continue.',
   'settings.onboardingGateTooltipAmr': 'The next steps run on AI — sign in to OpenDesign Cloud to continue.',
   'settings.onboardingGateTooltipLocal': 'The next steps run on AI — select an available local CLI to continue.',
-  'settings.onboardingGateTooltipByok': 'The next steps run on AI — add and test your model key to continue.',
+  'settings.onboardingGateTooltipByok': 'The next steps run on AI — complete your model key details to continue.',
   'settings.onboardingRecommended': 'Recommended',
   'settings.onboardingAmrCloudOfficialBadge': 'Official',
   'settings.onboardingLocalTitle': 'Local Agent',

@@ -346,7 +346,7 @@ export const ru: Dict = {
   'settings.onboardingGateTooltipNoRuntime': 'Следующие шаги выполняются на ИИ — выберите способ запуска, чтобы продолжить.',
   'settings.onboardingGateTooltipAmr': 'Следующие шаги выполняются на ИИ — войдите в OpenDesign Cloud, чтобы продолжить.',
   'settings.onboardingGateTooltipLocal': 'Следующие шаги выполняются на ИИ — выберите доступный локальный CLI, чтобы продолжить.',
-  'settings.onboardingGateTooltipByok': 'Следующие шаги выполняются на ИИ — добавьте и протестируйте ключ модели, чтобы продолжить.',
+  'settings.onboardingGateTooltipByok': 'Следующие шаги выполняются на ИИ — заполните данные ключа модели, чтобы продолжить.',
   'settings.onboardingRecommended': 'Рекомендуется',
   'settings.onboardingAmrCloudOfficialBadge': 'Официальный',
   'settings.onboardingLocalTitle': 'Локальный агент',

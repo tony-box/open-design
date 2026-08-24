@@ -346,7 +346,7 @@ export const de: Dict = {
   'settings.onboardingGateTooltipNoRuntime': 'Die nächsten Schritte laufen über KI — wähle eine Laufzeit, um fortzufahren.',
   'settings.onboardingGateTooltipAmr': 'Die nächsten Schritte laufen über KI — melde dich bei OpenDesign Cloud an, um fortzufahren.',
   'settings.onboardingGateTooltipLocal': 'Die nächsten Schritte laufen über KI — wähle eine verfügbare lokale CLI, um fortzufahren.',
-  'settings.onboardingGateTooltipByok': 'Die nächsten Schritte laufen über KI — füge deinen Modell-Key hinzu und teste ihn, um fortzufahren.',
+  'settings.onboardingGateTooltipByok': 'Die nächsten Schritte laufen über KI — füge die Details deines Modell-Keys hinzu, um fortzufahren.',
   'settings.onboardingRecommended': 'Empfohlen',
   'settings.onboardingAmrCloudOfficialBadge': 'Offiziell',
   'settings.onboardingLocalTitle': 'Lokaler Agent',

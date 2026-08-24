@@ -346,7 +346,7 @@ export const ja: Dict = {
   'settings.onboardingGateTooltipNoRuntime': 'この先のステップは AI で実行されます。続けるには実行方法を選んでください。',
   'settings.onboardingGateTooltipAmr': 'この先のステップは AI で実行されます。続けるには OpenDesign Cloud にサインインしてください。',
   'settings.onboardingGateTooltipLocal': 'この先のステップは AI で実行されます。続けるには利用可能なローカル CLI を選んでください。',
-  'settings.onboardingGateTooltipByok': 'この先のステップは AI で実行されます。続けるにはモデルキーを追加してテストしてください。',
+  'settings.onboardingGateTooltipByok': 'この先のステップは AI で実行されます。続けるにはモデルキーの詳細を入力してください。',
   'settings.onboardingRecommended': 'おすすめ',
   'settings.onboardingAmrCloudOfficialBadge': '公式',
   'settings.onboardingLocalTitle': 'ローカルエージェント',

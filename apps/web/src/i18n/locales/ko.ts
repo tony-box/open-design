@@ -346,7 +346,7 @@ export const ko: Dict = {
   'settings.onboardingGateTooltipNoRuntime': '다음 단계는 AI로 실행됩니다 — 계속하려면 실행 방식을 선택하세요.',
   'settings.onboardingGateTooltipAmr': '다음 단계는 AI로 실행됩니다 — 계속하려면 OpenDesign Cloud에 로그인하세요.',
   'settings.onboardingGateTooltipLocal': '다음 단계는 AI로 실행됩니다 — 계속하려면 사용 가능한 로컬 CLI를 선택하세요.',
-  'settings.onboardingGateTooltipByok': '다음 단계는 AI로 실행됩니다 — 계속하려면 모델 키를 추가하고 테스트하세요.',
+  'settings.onboardingGateTooltipByok': '다음 단계는 AI로 실행됩니다 — 계속하려면 모델 키 정보를 입력하세요.',
   'settings.onboardingRecommended': '추천',
   'settings.onboardingAmrCloudOfficialBadge': '공식',
   'settings.onboardingLocalTitle': '로컬 에이전트',

@@ -140,7 +140,7 @@ test('[P0] @critical onboarding Local CLI card lets the user pick an agent model
   );
 });
 
-test('[P0] onboarding Local CLI path completes setup with the selected agent model', async ({ page }) => {
+test('[P0] onboarding Local CLI path completes setup without testing the connection', async ({ page }) => {
   const config = await wireOnboardingMocks(page, {
     amrAvailable: false,
     initialLoggedIn: true,
@@ -151,17 +151,10 @@ test('[P0] onboarding Local CLI path completes setup with the selected agent mod
   });
 
   await seedOnboardingConfig(page, config);
+  let connectionCalls = 0;
   await page.route('**/api/test/connection', async (route) => {
-    await route.fulfill({
-      json: {
-        ok: true,
-        kind: 'success',
-        latencyMs: 12,
-        model: 'glm-5',
-        agentName: 'Codex CLI',
-        sample: 'Connected',
-      },
-    });
+    connectionCalls += 1;
+    await route.abort();
   });
   await gotoOnboarding(page);
 
@@ -169,11 +162,10 @@ test('[P0] onboarding Local CLI path completes setup with the selected agent mod
   const localPanel = page.locator('.onboarding-view__setup-panel');
   await expect(localPanel).toBeVisible();
   await selectOnboardingOption(localPanel, 'Model', 'GLM 5');
-  await page.getByRole('button', { name: /^Test$/i }).click();
-  await expectConnectionSuccess(page);
   await page.getByRole('button', { name: /^Continue$/i }).click();
 
   await expectOnboardingFinished(page);
+  expect(connectionCalls).toBe(0);
   await pollStoredConfig(page).toMatchObject({
     mode: 'daemon',
     agentId: 'codex',
@@ -550,7 +542,7 @@ for (const destination of [
   });
 }
 
-test('[P0] onboarding configuration Back returns to the source chooser with the test gate locked', async ({ page }) => {
+test('[P0] onboarding configuration Back returns to the source chooser with incomplete setup locked', async ({ page }) => {
   const config = await wireOnboardingMocks(page, {
     amrAvailable: true,
     initialLoggedIn: true,
@@ -633,13 +625,13 @@ test('[P0] @critical onboarding BYOK path can fetch models, test the provider, a
   });
 });
 
-test('[P0] onboarding BYOK Continue tests the configuration and retries after failure', async ({ page }) => {
+test('[P0] onboarding BYOK Continue saves complete configuration without testing it', async ({ page }) => {
   const config = await wireOnboardingMocks(page, {
     amrAvailable: true,
     initialLoggedIn: true,
   });
 
-  let connectionOk = false;
+  let connectionCalls = 0;
   await page.route('**/api/provider/models', async (route) => {
     await route.fulfill({
       json: {
@@ -651,22 +643,8 @@ test('[P0] onboarding BYOK Continue tests the configuration and retries after fa
     });
   });
   await page.route('**/api/test/connection', async (route) => {
-    await route.fulfill({
-      json: connectionOk
-        ? {
-            ok: true,
-            kind: 'success',
-            latencyMs: 18,
-            model: 'claude-sonnet-4-5',
-            sample: 'Connected',
-          }
-        : {
-            ok: false,
-            kind: 'error',
-            latencyMs: 18,
-            error: 'Invalid API key',
-          },
-    });
+    connectionCalls += 1;
+    await route.abort();
   });
 
   await seedOnboardingConfig(page, config);
@@ -679,7 +657,7 @@ test('[P0] onboarding BYOK Continue tests the configuration and retries after fa
   const continueButton = page.getByRole('button', { name: /^Continue$/i });
   await expect(continueButton).toHaveAttribute('aria-disabled', 'true');
 
-  await fillInlineField(page, 'API key', 'bad-api-key');
+  await fillInlineField(page, 'API key', 'test-api-key');
   await fillInlineField(page, 'Base URL', 'https://api.anthropic.com');
   await page.getByRole('button', { name: /Fetch models/i }).click();
   await expect(page.getByText(/Fetched 1 model/)).toBeVisible();
@@ -687,14 +665,15 @@ test('[P0] onboarding BYOK Continue tests the configuration and retries after fa
   await expect(continueButton).not.toHaveAttribute('aria-disabled', 'true');
 
   await continueButton.click();
-  await expect(page.getByText(/Invalid API key|Connection failed|failed/i)).toBeVisible();
-  await expect(page.getByRole('heading', { name: /Bring your own key|自己的模型 Key/i })).toBeVisible();
-  await expect(continueButton).not.toHaveAttribute('aria-disabled', 'true');
-
-  connectionOk = true;
-  await fillInlineField(page, 'API key', 'good-api-key');
-  await continueButton.click();
   await expectOnboardingFinished(page);
+  expect(connectionCalls).toBe(0);
+  await pollStoredConfig(page).toMatchObject({
+    mode: 'api',
+    apiKey: 'test-api-key',
+    baseUrl: 'https://api.anthropic.com',
+    model: 'claude-sonnet-4-5',
+    onboardingCompleted: true,
+  });
 });
 
 test('[P0] onboarding BYOK path supports Anthropic model selection and API key visibility before completing', async ({ page }) => {

@@ -346,7 +346,7 @@ export const fr: Dict = {
   'settings.onboardingGateTooltipNoRuntime': 'Les étapes suivantes tournent sur IA — choisissez un runtime pour continuer.',
   'settings.onboardingGateTooltipAmr': 'Les étapes suivantes tournent sur IA — connectez-vous à OpenDesign Cloud pour continuer.',
   'settings.onboardingGateTooltipLocal': 'Les étapes suivantes tournent sur IA — sélectionnez une CLI locale disponible pour continuer.',
-  'settings.onboardingGateTooltipByok': 'Les étapes suivantes tournent sur IA — ajoutez et testez votre clé de modèle pour continuer.',
+  'settings.onboardingGateTooltipByok': 'Les étapes suivantes tournent sur IA — complétez les informations de votre clé de modèle pour continuer.',
   'settings.onboardingRecommended': 'Recommandé',
   'settings.onboardingAmrCloudOfficialBadge': 'Officiel',
   'settings.onboardingLocalTitle': 'Agent local',

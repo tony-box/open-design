@@ -331,7 +331,7 @@ export const zhCN: Dict = {
   "settings.onboardingGateTooltipLocal":
     "后续流程由 AI 运行，请先选择一个可用的本地 CLI。",
   "settings.onboardingGateTooltipByok":
-    "后续流程由 AI 运行，请先填写并测试通过你的模型 Key。",
+    "后续流程由 AI 运行，请先填写你的模型 Key 信息。",
   "settings.onboardingRecommended": "推荐",
   "settings.onboardingAmrCloudOfficialBadge": "官方",
   "settings.onboardingLocalTitle": "本地 Agent",

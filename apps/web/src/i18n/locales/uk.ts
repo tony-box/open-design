@@ -346,7 +346,7 @@ export const uk: Dict = {
   'settings.onboardingGateTooltipNoRuntime': 'Наступні кроки виконуються на ШІ — виберіть спосіб запуску, щоб продовжити.',
   'settings.onboardingGateTooltipAmr': 'Наступні кроки виконуються на ШІ — увійдіть в OpenDesign Cloud, щоб продовжити.',
   'settings.onboardingGateTooltipLocal': 'Наступні кроки виконуються на ШІ — виберіть доступний локальний CLI, щоб продовжити.',
-  'settings.onboardingGateTooltipByok': 'Наступні кроки виконуються на ШІ — додайте та протестуйте ключ моделі, щоб продовжити.',
+  'settings.onboardingGateTooltipByok': 'Наступні кроки виконуються на ШІ — заповніть дані ключа моделі, щоб продовжити.',
   'settings.onboardingRecommended': 'Рекомендовано',
   'settings.onboardingAmrCloudOfficialBadge': 'Офіційний',
   'settings.onboardingLocalTitle': 'Локальний агент',

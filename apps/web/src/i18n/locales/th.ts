@@ -346,7 +346,7 @@ export const th: Dict = {
   'settings.onboardingGateTooltipNoRuntime': 'ขั้นตอนต่อไปทำงานด้วย AI — เลือกวิธีรันเพื่อดำเนินการต่อ',
   'settings.onboardingGateTooltipAmr': 'ขั้นตอนต่อไปทำงานด้วย AI — ลงชื่อเข้าใช้ OpenDesign Cloud เพื่อดำเนินการต่อ',
   'settings.onboardingGateTooltipLocal': 'ขั้นตอนต่อไปทำงานด้วย AI — เลือก CLI ในเครื่องที่พร้อมใช้งานเพื่อดำเนินการต่อ',
-  'settings.onboardingGateTooltipByok': 'ขั้นตอนต่อไปทำงานด้วย AI — เพิ่มและทดสอบคีย์โมเดลของคุณเพื่อดำเนินการต่อ',
+  'settings.onboardingGateTooltipByok': 'ขั้นตอนต่อไปทำงานด้วย AI — กรอกรายละเอียดคีย์โมเดลของคุณเพื่อดำเนินการต่อ',
   'settings.onboardingRecommended': 'แนะนำ',
   'settings.onboardingAmrCloudOfficialBadge': 'อย่างเป็นทางการ',
   'settings.onboardingLocalTitle': 'เอเจนต์ในเครื่อง',

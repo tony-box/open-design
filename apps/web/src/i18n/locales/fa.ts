@@ -346,7 +346,7 @@ export const fa: Dict = {
   'settings.onboardingGateTooltipNoRuntime': 'مراحل بعدی با هوش مصنوعی اجرا می‌شوند — برای ادامه یک روش اجرا انتخاب کنید.',
   'settings.onboardingGateTooltipAmr': 'مراحل بعدی با هوش مصنوعی اجرا می‌شوند — برای ادامه وارد OpenDesign Cloud شوید.',
   'settings.onboardingGateTooltipLocal': 'مراحل بعدی با هوش مصنوعی اجرا می‌شوند — برای ادامه یک CLI محلی در دسترس انتخاب کنید.',
-  'settings.onboardingGateTooltipByok': 'مراحل بعدی با هوش مصنوعی اجرا می‌شوند — برای ادامه کلید مدل خود را افزوده و تست کنید.',
+  'settings.onboardingGateTooltipByok': 'مراحل بعدی با هوش مصنوعی اجرا می‌شوند — برای ادامه جزئیات کلید مدل خود را تکمیل کنید.',
   'settings.onboardingRecommended': 'پیشنهادی',
   'settings.onboardingAmrCloudOfficialBadge': 'رسمی',
   'settings.onboardingLocalTitle': 'عامل محلی',
