@@ -23,11 +23,23 @@ const campaignDialogStyles = readFileSync(
 );
 
 describe('DeepSeek V4 Flash campaign', () => {
-  it('keeps the promotion attached only to the Flash model', () => {
+  // The campaign now covers BOTH V4 models on one shared window. Pro is the
+  // headline benefit and Flash rides along; a promotion that reached only one
+  // of them would contradict every surface, which advertises the pair.
+  it('attaches the promotion to both V4 campaign models', () => {
+    expect(isDeepSeekV4FlashCampaignModel('deepseek-v4-pro')).toBe(true);
     expect(isDeepSeekV4FlashCampaignModel('deepseek-v4-flash')).toBe(true);
+    expect(isDeepSeekV4FlashCampaignModel(' DeepSeek-V4-Pro ')).toBe(true);
     expect(isDeepSeekV4FlashCampaignModel(' DeepSeek-V4-Flash ')).toBe(true);
-    expect(isDeepSeekV4FlashCampaignModel('deepseek-v4-pro')).toBe(false);
+  });
+
+  // …and to nothing else. A prefix match would sweep in every future V4 model.
+  it('leaves non-campaign models alone', () => {
     expect(isDeepSeekV4FlashCampaignModel('deepseek-v4')).toBe(false);
+    expect(isDeepSeekV4FlashCampaignModel('deepseek-v4-pro-max')).toBe(false);
+    expect(isDeepSeekV4FlashCampaignModel('deepseek-v3.2')).toBe(false);
+    expect(isDeepSeekV4FlashCampaignModel('')).toBe(false);
+    expect(isDeepSeekV4FlashCampaignModel(null)).toBe(false);
   });
 
   it('wires campaign copy through i18n keys in the dialog', () => {
@@ -37,10 +49,20 @@ describe('DeepSeek V4 Flash campaign', () => {
   });
 
   it('keeps the fixed window out of the primary headline and badge', () => {
-    expect(DEEPSEEK_V4_FLASH_CAMPAIGN.id).toBe('deepseek-v4-flash-unlimited-2026');
-    expect(DEEPSEEK_V4_FLASH_CAMPAIGN.modelId).toBe('deepseek-v4-flash');
-    expect(DEEPSEEK_V4_FLASH_CAMPAIGN.window.startAt).toContain('2026-08-06');
-    expect(DEEPSEEK_V4_FLASH_CAMPAIGN.window.endAtExclusive).toContain('2026-08-13T20:00:00');
+    // The id is what the modal's "already seen" record is keyed on, so it MUST
+    // differ from the finished free week: a returning user who dismissed that
+    // one has never seen this campaign and is owed its single showing.
+    expect(DEEPSEEK_V4_FLASH_CAMPAIGN.id).toBe('deepseek-v4-dual-unlimited-2026');
+    expect(DEEPSEEK_V4_FLASH_CAMPAIGN.id).not.toBe('deepseek-v4-flash-unlimited-2026');
+    // Pro is what 「立即使用」 switches a paid user to.
+    expect(DEEPSEEK_V4_FLASH_CAMPAIGN.modelId).toBe('deepseek-v4-pro');
+    expect(DEEPSEEK_V4_FLASH_CAMPAIGN.modelIds).toEqual([
+      'deepseek-v4-pro',
+      'deepseek-v4-flash',
+    ]);
+    // Opens the instant the free week closes — the two windows abut exactly.
+    expect(DEEPSEEK_V4_FLASH_CAMPAIGN.window.startAt).toContain('2026-08-13T20:00:00');
+    expect(DEEPSEEK_V4_FLASH_CAMPAIGN.window.endAtExclusive).toContain('2026-08-27T20:00:00');
   });
 
   it('uses a neutral gray restricted badge for anti-abuse fallback', () => {
@@ -102,7 +124,7 @@ describe('DeepSeek V4 Flash campaign', () => {
     );
   });
 
-  it('shows a shared live countdown in both paid and unpaid campaign modals', () => {
+  it('keeps the DeepSeek live countdown on the paid campaign modal', () => {
     const start = Date.parse(DEEPSEEK_V4_FLASH_CAMPAIGN.window.startAt);
     const end = Date.parse(DEEPSEEK_V4_FLASH_CAMPAIGN.window.endAtExclusive);
     const t = (key: string, vars?: Record<string, string | number>) => {
@@ -129,12 +151,13 @@ describe('DeepSeek V4 Flash campaign', () => {
     expect(campaignDialogSource).toContain('styles.boundary');
   });
 
-  it('keeps the unpaid action on the upgrade flow without showing the paid secondary action', () => {
-    expect(campaignDialogSource).toContain("t('campaign.deepseekV4Flash.unpaid.cta')");
-    expect(campaignDialogSource).toContain("'deepseek_unpaid_modal'");
-    expect(campaignDialogSource).toContain('attributedAmrUrl(plansUrl, attribution, deviceId)');
-    expect(campaignDialogSource).toContain('metricsConsent,');
-    expect(campaignDialogSource).toMatch(/\{paid \? \([\s\S]*campaign\.deepseekV4Flash\.later[\s\S]*\) : null\}/);
+  it('reuses the modal shell for Go without showing the paid secondary action', () => {
+    expect(campaignDialogSource).toContain('styles.goWelcomePrimary');
+    expect(campaignDialogSource).toContain('goPlanPricingUrl');
+    expect(campaignDialogSource).not.toContain("'go_plan_modal'");
+    expect(campaignDialogSource.indexOf('styles.goWelcomePrimary')).toBeLessThan(
+      campaignDialogSource.indexOf('styles.laterAction'),
+    );
   });
 
   it('keeps campaign visibility free of every URL review backdoor (product decision)', () => {

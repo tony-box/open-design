@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { todoSnapshotHasUnfinishedWork } from '@open-design/contracts';
+import { strategyTaskProvesDelivery, todoSnapshotHasUnfinishedWork } from '@open-design/contracts';
 import { normalizeMediaExecutionPolicyForRun } from '../media/policy.js';
 import {
   normalizeRunToolBundleForRun,
@@ -20,6 +20,11 @@ import {
   RESTART_ERROR_CODE,
   RESTART_ERROR_MESSAGE,
 } from './run-restart-recovery.js';
+import {
+  beginRunTelemetryDelivery,
+  finalizeRunTelemetryDelivery,
+  recordRunTelemetryDeliveryAttempt,
+} from '../observability/delivery-state.js';
 
 export const TERMINAL_RUN_STATUSES = new Set(['succeeded', 'failed', 'canceled']);
 
@@ -203,6 +208,8 @@ function summarizeAssistantMessageEvents(events) {
   let upstreamErrorCount = 0;
   let provider;
   let model;
+  let usageProvider;
+  let usageModel;
   let fallbackOrdinal = 0;
   const countErrorClass = (value) => {
     if (value === 'rate_limited') rateLimitedCount += 1;
@@ -212,6 +219,15 @@ function summarizeAssistantMessageEvents(events) {
   for (const record of events) {
     if (record?.event !== 'agent' || !record.data || typeof record.data !== 'object') continue;
     const data = record.data;
+    if (data.type === 'usage') {
+      if (typeof data.provider === 'string' && data.provider.trim()) {
+        usageProvider = data.provider.trim();
+      }
+      if (typeof data.model === 'string' && data.model.trim()) {
+        usageModel = data.model.trim();
+      }
+      continue;
+    }
     if (data.type !== 'diagnostic') continue;
     if (data.name === 'model_retry') {
       retryCount += 1;
@@ -282,8 +298,8 @@ function summarizeAssistantMessageEvents(events) {
     rateLimitedCount,
     timeoutCount,
     upstreamErrorCount,
-    provider,
-    model,
+    provider: provider ?? usageProvider,
+    model: model ?? usageModel,
   };
 }
 
@@ -502,6 +518,9 @@ function durableRunState(run) {
     assistantMessageId: run.assistantMessageId,
     clientRequestId: run.clientRequestId,
     requestFingerprint: run.requestFingerprint,
+    ...(run.strategyRolloutDecision
+      ? { strategyRolloutDecision: run.strategyRolloutDecision }
+      : {}),
     agentId: run.agentId,
     status: run.status,
     createdAt: run.createdAt,
@@ -513,8 +532,11 @@ function durableRunState(run) {
     failureCategory: run.failureCategory ?? null,
     failureDetail: run.failureDetail ?? null,
     failureAction: run.failureAction ?? null,
+    cancelOrigin: run.cancelOrigin ?? null,
+    terminalTrigger: run.terminalTrigger ?? null,
     resumable: run.resumable ?? false,
     artifactCount: Number.isFinite(run.artifactCount) ? run.artifactCount : 0,
+    ...(Array.isArray(run.artifactPaths) ? { artifactPaths: run.artifactPaths } : {}),
     endedWithUnfinishedWork: Boolean(run.endedWithUnfinishedWork),
     ...(typeof run.userPrompt === 'string' ? { userPrompt: run.userPrompt } : {}),
     ...(typeof run.model === 'string' ? { model: run.model } : {}),
@@ -564,9 +586,14 @@ function durableRunState(run) {
     ...(typeof run.deliverableArtifactKind === 'string'
       ? { deliverableArtifactKind: run.deliverableArtifactKind }
       : {}),
+    ...(run.strategyTask ? { strategyTask: run.strategyTask } : {}),
+    ...(run.odNextTaskInputSnapshot
+      ? { odNextTaskInputSnapshot: run.odNextTaskInputSnapshot }
+      : {}),
     ...(typeof run.langfuseCompletedAt === 'number'
       ? { langfuseCompletedAt: run.langfuseCompletedAt }
       : {}),
+    ...(run.telemetryDelivery ? { telemetryDelivery: run.telemetryDelivery } : {}),
   };
 }
 
@@ -636,6 +663,12 @@ export function createChatRunService({
   // outlives buffer truncation. Kept generic here: this service does not
   // interpret event semantics, it just hands each record to the observer.
   onEventEmitted = null,
+  // Optional synchronous hook invoked immediately before the single physical
+  // terminal transition. The daemon uses this to converge durable logical
+  // task state before the `end` event is persisted or published. Keeping the
+  // hook here covers startup failures and daemon shutdown in addition to the
+  // normal child-close path.
+  beforeFinish = null,
 }) {
   const runs = new Map();
   const runIdsByClientRequestId = new Map();
@@ -731,6 +764,8 @@ export function createChatRunService({
       childPid: null,
       processGroupId: null,
       cancelRequested: false,
+      cancelOrigin: state.cancelOrigin ?? null,
+      terminalTrigger: state.terminalTrigger ?? null,
       eventsLogPath,
       statePath,
       eventsLogStream: null,
@@ -754,6 +789,12 @@ export function createChatRunService({
       requestFingerprint:
         typeof meta.requestFingerprint === 'string' && meta.requestFingerprint
           ? meta.requestFingerprint
+          : null,
+      strategyRolloutDecision:
+        meta.strategyRolloutDecision
+        && typeof meta.strategyRolloutDecision === 'object'
+        && !Array.isArray(meta.strategyRolloutDecision)
+          ? meta.strategyRolloutDecision
           : null,
       agentId: typeof meta.agentId === 'string' && meta.agentId ? meta.agentId : null,
       projectMetadata:
@@ -823,6 +864,8 @@ export function createChatRunService({
       error: null,
       errorCode: null,
       cancelRequested: false,
+      cancelOrigin: null,
+      terminalTrigger: null,
       runtimeFailureObservedBeforeCancellation: false,
       retryRestartTimer: null,
       // First failure that triggered a same-run retry. The next attempt creates
@@ -852,6 +895,7 @@ export function createChatRunService({
       truncatedMidTurn: false,
       endedWithUnfinishedWork: false,
       artifactCount: undefined as number | undefined,
+      artifactPaths: undefined as string[] | undefined,
       artifactOutcome: undefined,
       eventsLogPath: runsLogDir ? path.join(runsLogDir, id, 'events.jsonl') : null,
       statePath: runsLogDir ? path.join(runsLogDir, id, 'state.json') : null,
@@ -863,6 +907,13 @@ export function createChatRunService({
       manualResumeAttemptCount: 0,
       rechargeWaitDurationMs: 0,
     };
+    if (
+      meta.odNextTaskInputSnapshot
+      && typeof meta.odNextTaskInputSnapshot === 'object'
+      && !Array.isArray(meta.odNextTaskInputSnapshot)
+    ) {
+      run.odNextTaskInputSnapshot = meta.odNextTaskInputSnapshot;
+    }
     if (Object.prototype.hasOwnProperty.call(meta, 'workspaceScope')) {
       run.workspaceScope = meta.workspaceScope ?? null;
     }
@@ -928,10 +979,52 @@ export function createChatRunService({
     persistState(run);
   };
 
+  const beginTelemetryDelivery = (run) => {
+    if (!run) return null;
+    run.telemetryDelivery = beginRunTelemetryDelivery(
+      run.telemetryDelivery,
+      run.id,
+    );
+    persistState(run);
+    return run.telemetryDelivery;
+  };
+
+  const finalizeTelemetryDelivery = (run, delivery) => {
+    if (!run || !delivery) return null;
+    run.telemetryDelivery = finalizeRunTelemetryDelivery(
+      run.telemetryDelivery,
+      run.id,
+      delivery,
+    );
+    if (typeof run.telemetryDelivery.finalizedAt === 'number') {
+      run.langfuseCompletedAt = run.telemetryDelivery.finalizedAt;
+    } else {
+      delete run.langfuseCompletedAt;
+    }
+    persistState(run);
+    return run.telemetryDelivery;
+  };
+
+  const recordTelemetryDeliveryAttempt = (run) => {
+    if (!run) return null;
+    run.telemetryDelivery = recordRunTelemetryDeliveryAttempt(
+      run.telemetryDelivery,
+      run.id,
+    );
+    persistState(run);
+    return run.telemetryDelivery;
+  };
+
+  // Compatibility alias for older in-process callers. New delivery paths use
+  // the explicit begin/finalize pair so a daemon crash cannot be confused
+  // with a terminal network failure.
   const markLangfuseCompleted = (run) => {
     if (!run) return;
-    run.langfuseCompletedAt = Date.now();
-    persistState(run);
+    finalizeTelemetryDelivery(run, {
+      langfuse_expected: true,
+      langfuse_delivery_status: 'accepted',
+      langfuse_attempt_count: 1,
+    });
   };
 
   const setDeliverableValidation = (run, result) => {
@@ -983,6 +1076,8 @@ export function createChatRunService({
     run.failureAction = null;
     run.resumable = false;
     run.cancelRequested = false;
+    run.cancelOrigin = null;
+    run.terminalTrigger = null;
     run.runtimeFailureObservedBeforeCancellation = false;
     run.retryRestartTimer = null;
     run.retryAttemptCount = 0;
@@ -991,6 +1086,7 @@ export function createChatRunService({
     run.retryOriginFailure = null;
     run.retryOriginErrorCode = null;
     run.artifactCount = undefined;
+    run.artifactPaths = undefined;
     run.artifactOutcome = undefined;
     run.deliverableValid = undefined;
     run.deliverableValidation = undefined;
@@ -1005,6 +1101,18 @@ export function createChatRunService({
     run.stdinOpen = false;
     run.eventsLogStream = null;
     run.eventsLogClosed = false;
+    // A resumed attempt is a fresh execution, so it must not inherit the prior
+    // attempt's lifecycle marks. Keeping them makes every phase boundary
+    // measure from before the recharge pause, putting the wait time inside the
+    // new attempt's model-active window. Only the logical run start survives,
+    // so queue time is still measured from when the user asked for the run.
+    run.analyticsTelemetry = {
+      ...(run.analyticsTelemetry?.startRequestedAt !== undefined
+        ? { startRequestedAt: run.analyticsTelemetry.startRequestedAt }
+        : {}),
+      attemptStartedAt: resumedAt,
+      attemptIndex: 0,
+    };
     run.manualResumeAttemptCount = (run.manualResumeAttemptCount ?? 0) + 1;
     run.rechargeWaitDurationMs =
       (run.rechargeWaitDurationMs ?? 0) + rechargeWaitDurationMs;
@@ -1096,10 +1204,13 @@ export function createChatRunService({
     designSystemDigest: run.designSystemDigest ?? null,
     appliedPluginSnapshotId: run.appliedPluginSnapshotId ?? null,
     pluginId: run.pluginId ?? null,
+    strategyRolloutDecision: run.strategyRolloutDecision ?? null,
     status: run.status,
     createdAt: run.createdAt,
     updatedAt: run.updatedAt,
     cancelRequested: !!run.cancelRequested,
+    cancelOrigin: run.cancelOrigin ?? null,
+    terminalTrigger: run.terminalTrigger ?? null,
     childPid: typeof run.child?.pid === 'number' ? run.child.pid : run.childPid ?? null,
     processGroupId: run.processGroupId ?? null,
     childExited: !run.child || run.child.exitCode !== null || run.child.signalCode !== null,
@@ -1114,6 +1225,7 @@ export function createChatRunService({
     resumable: run.resumable ?? false,
     endedWithUnfinishedWork: !!run.endedWithUnfinishedWork,
     ...(Number.isFinite(run.artifactCount) ? { artifactCount: run.artifactCount } : {}),
+    ...(Array.isArray(run.artifactPaths) ? { artifactPaths: run.artifactPaths } : {}),
     eventsLogPath: run.eventsLogPath ?? null,
     workspace: projectWorkspaceProvenance(run.projectMetadata),
     mediaExecution: run.mediaExecution ?? normalizeMediaExecutionPolicyForRun(null),
@@ -1149,6 +1261,7 @@ export function createChatRunService({
     ...(typeof run.deliverableArtifactKind === 'string'
       ? { deliverableArtifactKind: run.deliverableArtifactKind }
       : {}),
+    ...(run.strategyTask ? { strategyTask: run.strategyTask } : {}),
     ...(TERMINAL_RUN_STATUSES.has(run.status)
       ? { executionDiagnostics: buildExecutionDiagnostics(run) }
       : {}),
@@ -1156,6 +1269,7 @@ export function createChatRunService({
 
   const finish = (run, status, code: number | null = null, signal: string | null = null) => {
     if (TERMINAL_RUN_STATUSES.has(run.status)) return;
+    if (beforeFinish) beforeFinish(run, status, code, signal);
     run.status = status;
     run.exitCode = code;
     run.signal = signal;
@@ -1166,8 +1280,16 @@ export function createChatRunService({
     // (#1247 / #1060). A truncated turn (max_tokens) counts as unfinished even
     // if the last TodoWrite looked done. Absence of any TodoWrite snapshot keeps
     // the flag false, so a text-only answer stays "Completed".
+    //
+    // A settled strategy verdict outranks the TodoWrite narration: the task
+    // reaches `completed` only once the deliverable was verified on disk, and
+    // the agent's own checklist is routinely left with a stale `pending` item.
+    // Truncation stays an independent term — a cut-off generation is unfinished
+    // whatever verdict was recorded.
     run.endedWithUnfinishedWork =
-      Boolean(run.truncatedMidTurn) || todoSnapshotHasUnfinishedWork(run.lastTodoSnapshot);
+      Boolean(run.truncatedMidTurn)
+      || (!strategyTaskProvesDelivery(run.strategyTask)
+        && todoSnapshotHasUnfinishedWork(run.lastTodoSnapshot));
     // Release run-scoped resources the starter registered (e.g. the minted
     // tool-token grant + agent event-sink entries). This runs on EVERY
     // terminal path — including a startup throw that never reached the child
@@ -1185,8 +1307,10 @@ export function createChatRunService({
       resumable: run.resumable ?? false,
       endedWithUnfinishedWork: run.endedWithUnfinishedWork,
       ...(Number.isFinite(run.artifactCount) ? { artifactCount: run.artifactCount } : {}),
+      ...(Array.isArray(run.artifactPaths) ? { artifactPaths: run.artifactPaths } : {}),
       failureCategory: run.failureCategory ?? null,
       failureDetail: run.failureDetail ?? null,
+      ...(run.strategyTask ? { strategyTask: run.strategyTask } : {}),
     });
     for (const sse of run.clients) sse.end();
     run.clients.clear();
@@ -1408,13 +1532,14 @@ export function createChatRunService({
     }
   };
 
-  const cancel = async (run) => {
+  const cancel = async (run, origin = 'unknown') => {
     if (TERMINAL_RUN_STATUSES.has(run.status)) return statusBody(run);
     run.cancelRequested = true;
+    run.cancelOrigin = origin;
     run.updatedAt = Date.now();
     clearPendingRetryRestart(run);
-    closeRunStdin(run);
     if (!run.child) {
+      closeRunStdin(run);
       finish(run, 'canceled', null, 'SIGTERM');
       return statusBody(run);
     }
@@ -1432,6 +1557,7 @@ export function createChatRunService({
       if (await waitForCanceledChildExit(run, graceMs)) {
         return finishCanceledFromChildState(run, 'SIGTERM');
       }
+      closeRunStdin(run);
       killChild(run, 'SIGTERM');
       if (await waitForCanceledChildExit(run, graceMs)) {
         return finishCanceledFromChildState(run, 'SIGTERM');
@@ -1441,6 +1567,7 @@ export function createChatRunService({
       return finishCanceledFromChildState(run, 'SIGKILL');
     }
 
+    closeRunStdin(run);
     killChild(run, 'SIGTERM');
     if (await waitForCanceledChildExit(run, cancelGraceMs())) {
       return finishCanceledFromChildState(run, 'SIGTERM');
@@ -1454,9 +1581,9 @@ export function createChatRunService({
     const activeRuns = Array.from(runs.values()).filter((run) => !TERMINAL_RUN_STATUSES.has(run.status));
     await Promise.all(activeRuns.map(async (run) => {
       run.cancelRequested = true;
+      run.cancelOrigin = 'daemon_shutdown';
       run.updatedAt = Date.now();
       clearPendingRetryRestart(run);
-      closeRunStdin(run);
       if (run.acpSession?.abort) {
         try {
           run.acpSession.abort();
@@ -1464,6 +1591,7 @@ export function createChatRunService({
           // Process signals below are the shutdown fallback.
         }
       }
+      closeRunStdin(run);
       killChild(run, 'SIGTERM');
       finish(run, 'canceled', null, 'SIGTERM');
       if (run.child && !(await waitForChildExit(run.child, graceMs))) {
@@ -1542,6 +1670,9 @@ export function createChatRunService({
     persistState,
     setAnalyticsRecovery,
     markAnalyticsCompleted,
+    beginTelemetryDelivery,
+    recordTelemetryDeliveryAttempt,
+    finalizeTelemetryDelivery,
     markLangfuseCompleted,
     setDeliverableValidation,
     finish,

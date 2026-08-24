@@ -50,6 +50,10 @@ export function clearAnonymousState(storage: Storage): void {
 
 export async function isAmrLoggedIn(): Promise<boolean> {
   const response = await fetch('/api/integrations/vela/status', { cache: 'no-store' });
+  if (response.status === 503) {
+    const payload = (await response.clone().json().catch(() => null)) as { error?: string } | null;
+    if (payload?.error === 'amr-runtime-unavailable') return false;
+  }
   if (!response.ok) throw new Error(`AMR status failed: ${response.status}`);
   const payload = (await response.json()) as { loggedIn?: boolean };
   return payload.loggedIn === true;
@@ -93,11 +97,6 @@ export async function pullMessageCenter(input: {
 export async function markAccountMessageRead(messageId: string): Promise<void> {
   const response = await fetch(`${ACCOUNT_PROXY}/messages/${encodeURIComponent(messageId)}/read`, { method: 'POST' });
   if (!response.ok) throw new Error(`Mark message read failed: ${response.status}`);
-}
-
-export async function markAllAccountMessagesRead(): Promise<void> {
-  const response = await fetch(`${ACCOUNT_PROXY}/read-all`, { method: 'POST' });
-  if (!response.ok) throw new Error(`Mark all messages read failed: ${response.status}`);
 }
 
 function apiLocale(locale: string): string {

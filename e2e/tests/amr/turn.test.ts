@@ -40,7 +40,7 @@ type ProjectResponse = {
   project: { id: string; metadata?: { kind?: string }; name: string };
 };
 
-// Inline fake `vela` binary. Handles the two argv shapes Open Design's
+// Inline fake `vela` binary. Handles the two argv shapes OpenDesign's
 // daemon ever spawns:
 //
 //   `vela models`                       — legacy catalog probe compatibility.
@@ -357,6 +357,9 @@ describe('AMR chat-run end-to-end', () => {
       const runEvents = await readRunEvents(webUrl, run.runId, {
         headers: { ...AMR_TEST_WORKSPACE_HEADERS },
       });
+      const toolTokenExpiry = runEvents.match(/"toolTokenExpiresAt":"([^"]+)"/)?.[1];
+      expect(toolTokenExpiry, 'run start event exposes the run-scoped tool-token deadline').toBeTruthy();
+      expect(Date.parse(toolTokenExpiry ?? '') - t0).toBeGreaterThanOrEqual(44 * 60 * 1000);
       expect(runEvents).toContain('"type":"usage"');
       expect(runEvents).toContain('input_tokens');
       expect(runEvents).toContain('output_tokens');
@@ -409,20 +412,10 @@ describe('AMR chat-run end-to-end', () => {
     const authority = createServer((req, res) => {
       if (
         req.method === 'GET' &&
-        (req.url === '/api/v1/workspaces' || req.url === '/api/v1/workspaces/current')
+        req.url === '/api/v1/workspaces'
       ) {
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify(
-          req.url.endsWith('/current')
-            ? {
-                ...workspace,
-                billingState: 'active',
-                planId: 'team_plus',
-                providerMode: 'platform_credits',
-                seatSummary: { seatLimit: 5, usedSeats: 2 },
-              }
-            : { items: [personalWorkspace, workspace] },
-        ));
+        res.end(JSON.stringify({ items: [personalWorkspace, workspace] }));
         return;
       }
       res.writeHead(404, { 'content-type': 'application/json' });

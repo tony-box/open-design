@@ -32,7 +32,7 @@ import {
 } from '../db.js';
 import {
   enforceVerifiedWorkspaceResourceMutation,
-  resolveOptionalWorkspaceRequestAuthority,
+  resolveOptionalLocalWorkspaceRequestAuthority,
   type VerifyWorkspaceRequestAuthority,
 } from '../collab/workspace-resource-mutation.js';
 import { listCodexPets, readCodexPetSpritesheet } from '../codex-pets.js';
@@ -72,6 +72,9 @@ export interface RegisterAtomRoutesDeps {
 }
 
 export interface RegisterStaticResourceRoutesDeps extends RouteDeps<'db' | 'http' | 'paths' | 'resources'> {
+  /** Settled, TTL-bounded authority for pure local catalog reads. */
+  verifyWorkspaceReadAuthority?: VerifyWorkspaceRequestAuthority;
+  /** Fresh authority for mutations, materialization, and detail reads. */
   verifyWorkspaceRequestAuthority?: VerifyWorkspaceRequestAuthority;
   tokenContractRebuild?: {
     maybeStartForImportedDesignSystem?: (
@@ -263,7 +266,10 @@ export function registerStaticResourceRoutes(app: Express, ctx: RegisterStaticRe
   const resolveWorkspaceAuthority = async (
     req: any,
     res: Response,
-    options: { allowNavigationQuery?: boolean } = {},
+    options: {
+      allowNavigationQuery?: boolean;
+      verifyAuthority?: VerifyWorkspaceRequestAuthority | undefined;
+    } = {},
   ): Promise<WorkspaceCollabContext | null | undefined> => {
     const scopedRequest = options.allowNavigationQuery
       ? requestWithNavigationScope(req)
@@ -277,10 +283,7 @@ export function registerStaticResourceRoutes(app: Express, ctx: RegisterStaticRe
       );
       return undefined;
     }
-    const authority = await resolveOptionalWorkspaceRequestAuthority(
-      scopedRequest,
-      ctx.verifyWorkspaceRequestAuthority,
-    );
+    const authority = resolveOptionalLocalWorkspaceRequestAuthority(scopedRequest);
     if (!authority.ok) {
       sendApiError(res, authority.status, authority.code, authority.message, {
         ...(authority.retryable ? { retryable: true } : {}),
@@ -302,6 +305,16 @@ export function registerStaticResourceRoutes(app: Express, ctx: RegisterStaticRe
   ): Promise<boolean> => {
     const binding = getWorkspaceResourceByResourceId(db, 'skill', skillId);
     if (!binding) return true;
+    const localAuthority = resolveOptionalLocalWorkspaceRequestAuthority(req);
+    if (!localAuthority.ok) {
+      sendApiError(
+        res,
+        localAuthority.status,
+        localAuthority.code,
+        localAuthority.message,
+      );
+      return false;
+    }
     return enforceVerifiedWorkspaceResourceMutation(
       'skill',
       req,
@@ -312,7 +325,9 @@ export function registerStaticResourceRoutes(app: Express, ctx: RegisterStaticRe
       db,
       skillId,
       capability,
-      ctx.verifyWorkspaceRequestAuthority,
+      localAuthority.context
+        ? async () => ({ ok: true as const, context: localAuthority.context! })
+        : undefined,
     );
   };
   const hasActiveTeamSkillBinding = (
@@ -483,7 +498,11 @@ export function registerStaticResourceRoutes(app: Express, ctx: RegisterStaticRe
       // Workspace-scoped (see `skillVisibleFromWorkspace` in skills.ts): a
       // skill imported into a different workspace than the caller's is
       // hidden, same one-way rule `GET /api/plugins` already applies.
-      const authority = await resolveWorkspaceAuthority(req, res);
+      const authority = await resolveWorkspaceAuthority(req, res, {
+        verifyAuthority:
+          ctx.verifyWorkspaceReadAuthority
+          ?? ctx.verifyWorkspaceRequestAuthority,
+      });
       if (authority === undefined) return;
       const workspaceId = authority?.workspaceId ?? null;
       const skills = await listAllSkills({
@@ -778,12 +797,17 @@ export function registerStaticResourceRoutes(app: Express, ctx: RegisterStaticRe
       // share one directory on disk, so without this the systems authored in
       // one workspace also filled a brand-new one. Every other caller of
       // `listAllDesignSystems` resolves a system by id and stays unscoped.
-      const workspaceContext = ctx.verifyWorkspaceRequestAuthority
-        ? await resolveWorkspaceAuthority(req, res)
+      const catalogAuthority =
+        ctx.verifyWorkspaceReadAuthority
+        ?? ctx.verifyWorkspaceRequestAuthority;
+      const workspaceContext = catalogAuthority
+        ? await resolveWorkspaceAuthority(req, res, {
+            verifyAuthority: catalogAuthority,
+          })
         : null;
       if (workspaceContext === undefined) return;
       const workspaceId = workspaceContext?.workspaceId
-        ?? (ctx.verifyWorkspaceRequestAuthority ? null : (await resolveWorkspaceScope?.(req)) ?? null);
+        ?? (catalogAuthority ? null : (await resolveWorkspaceScope?.(req)) ?? null);
       const workspaceMemberId = workspaceContext?.workspaceMemberId ?? null;
       const catalog = await listAllDesignSystems({
         workspaceId,
@@ -1279,7 +1303,7 @@ export function registerStaticResourceRoutes(app: Express, ctx: RegisterStaticRe
       try {
         const runtimeRoot = fs.realpathSync.native(RUNTIME_DATA_DIR_CANONICAL);
         if (sourceRoot === runtimeRoot || sourceRoot.startsWith(`${runtimeRoot}${path.sep}`)) {
-          return sendApiError(res, 400, 'BAD_REQUEST', 'cannot import Open Design runtime data');
+          return sendApiError(res, 400, 'BAD_REQUEST', 'cannot import OpenDesign runtime data');
         }
       } catch {
         // The runtime data directory may not exist yet in first-run tests.
@@ -1471,9 +1495,12 @@ function normalizeDesignSystemCraftApplies(value: unknown): string[] | undefined
 }
 
 export function assembleExample(templateHtml: string, slidesHtml: string, title: string) {
+  // Function replacements: string replacements would expand `$$`, `$&`, `$``,
+  // and `$'` inside the skill-derived inputs via String.prototype.replace's
+  // GetSubstitution (#6795).
   return templateHtml
-    .replace('<!-- SLIDES_HERE -->', slidesHtml)
-    .replace(/<title>.*?<\/title>/, `<title>${title} | Open Design Example</title>`);
+    .replace('<!-- SLIDES_HERE -->', () => slidesHtml)
+    .replace(/<title>.*?<\/title>/, () => `<title>${title} | OpenDesign Example</title>`);
 }
 
 export function rewriteSkillAssetUrls(

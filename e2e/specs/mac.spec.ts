@@ -8,6 +8,16 @@ import { promisify } from 'node:util';
 
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
+import { createFakeAgentRuntimes } from '@/fake-agents';
+import {
+  assertPackagedHomeFirstRunResult,
+  PACKAGED_HOME_FIRST_RUN_OUTPUT,
+  PACKAGED_HOME_FIRST_RUN_PROMPT,
+  packagedHomeFirstRunExpression,
+  packagedHomeFirstRunSnapshotExpression,
+  packagedHomeFirstRunSubmitExpression,
+  type PackagedHomeFirstRunResult,
+} from '@/vitest/packaged-home-first-run';
 import { createPackagedSmokeReport } from '@/vitest/packaged-report';
 import {
   assertPackagedPtySmokeResult,
@@ -352,6 +362,66 @@ const desktopMacDescribe = shouldRunDesktopMacSmoke ? describe : describe.skip;
 macDescribe('packaged mac runtime smoke', () => {
   let installedAppPath: string | null = null;
   let started = false;
+
+  test('[P0] @electron-smoke cold first Home run renders assistant output without refresh or workspace-tab switching', async () => {
+    const fakeAgentRoot = join(toolsPackDir, 'fixtures', `home-first-run-${namespace}`);
+    let firstRunInstalledAppPath: string | null = null;
+    let firstRunStarted = false;
+    try {
+      await resetPackagedRuntimeState();
+      const fakeAgents = await createFakeAgentRuntimes({
+        root: fakeAgentRoot,
+        runtimeIds: ['codex'],
+      });
+      const install = await runToolsPackJson<MacInstallResult>('install');
+      firstRunInstalledAppPath = install.installedAppPath;
+      await seedPackagedHomeFirstRunConfig(fakeAgents.codex.env);
+
+      const start = await runToolsPackJson<MacStartResult>('start');
+      firstRunStarted = true;
+      expect(start.source).toBe('installed');
+      await waitForHealthyDesktop();
+
+      const setup = await runToolsPackJson<MacInspectResult>('inspect', [
+        '--expr',
+        packagedHomeFirstRunExpression(),
+      ]);
+      if (setup.eval?.ok !== true) {
+        throw new Error(`packaged first Home run setup failed: ${formatUnknown(setup.eval)}`);
+      }
+      expect(setup.eval.value).toMatchObject({
+        inputTextBeforeSubmit: PACKAGED_HOME_FIRST_RUN_PROMPT,
+        submitClicked: false,
+      });
+
+      await waitForPackagedHomeFirstRunSubmit();
+      const firstRun = await waitForPackagedHomeFirstRunOutput();
+      expect(firstRun.submitClicked).toBe(true);
+      expect(firstRun.projectId).toEqual(expect.any(String));
+      expect(firstRun.hrefBefore).toMatch(/^(od:\/\/app\/|http:\/\/127\.0\.0\.1:\d+\/$)/);
+      expect(firstRun.hrefAfter).toContain(`/projects/${firstRun.projectId}`);
+      expect(firstRun.injectedAuthorityOutageCount).toBe(1);
+      expect(firstRun.createRunRequestCount).toBeGreaterThanOrEqual(2);
+      expect(firstRun.createRunResponseStatuses[0]).toBe(503);
+      expect(firstRun.createRunResponseStatuses.at(-1)).toBeGreaterThanOrEqual(200);
+      expect(firstRun.createRunResponseStatuses.at(-1)).toBeLessThan(300);
+      expect(firstRun.runEventRequestCount).toBeGreaterThan(0);
+      expect(firstRun.runEventResponseStatuses).toContain(200);
+      expect(firstRun.runEventsContainExpectedOutput).toBe(true);
+      expect(firstRun.daemonAssistantText).toContain(PACKAGED_HOME_FIRST_RUN_OUTPUT);
+      expect(firstRun.assistantText).toContain(PACKAGED_HOME_FIRST_RUN_OUTPUT);
+      expect(firstRun.workspaceTabClicksBeforeOutput).toBe(0);
+      expect(firstRun.navigationEntryCountAfter).toBe(firstRun.navigationEntryCountBefore);
+      expect(firstRun.performanceTimeOriginAfter).toBe(firstRun.performanceTimeOriginBefore);
+    } finally {
+      if (firstRunStarted || firstRunInstalledAppPath != null) {
+        await runToolsPackJson<MacUninstallResult>('uninstall').catch((error: unknown) => {
+          console.error('failed to uninstall packaged first-Home-run app during cleanup', error);
+        });
+      }
+      await rm(fakeAgentRoot, { force: true, recursive: true }).catch(() => undefined);
+    }
+  }, 180_000);
 
   test('installs, starts, inspects, stops, and uninstalls the built mac artifact', async () => {
     const report = await createPackagedSmokeReport('mac');
@@ -1420,252 +1490,6 @@ desktopMacDescribe('mac desktop settings smoke', () => {
     });
   }, 45_000);
 
-  test('opens the Orbit section from the desktop shell and renders its primary surface', async () => {
-    await seedDesktopConfig(desktop, {
-      mode: 'api',
-      apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4o',
-      apiProtocol: 'openai',
-      apiProviderBaseUrl: 'https://api.openai.com/v1',
-      agentId: null,
-      skillId: null,
-      designSystemId: null,
-      composio: { apiKeyConfigured: true },
-      orbit: {
-        enabled: false,
-        time: '09:00',
-        templateSkillId: 'orbit-general',
-      },
-      onboardingCompleted: true,
-      mediaProviders: {},
-      agentModels: {},
-      theme: 'system',
-    }, 'model');
-
-    await desktop.openSettings();
-    await openDesktopSettingsSection(desktop, 'Orbit');
-
-    await waitFor(async () => {
-      const snapshot = await readDesktopOrbitSnapshot(desktop);
-      expect(snapshot.dialogOpen).toBe(true);
-      expect(snapshot.heading).toBe('Orbit');
-      expect(snapshot.sectionTitle).toBe('Orbit');
-      expect(snapshot.runButtonVisible).toBe(true);
-      expect(snapshot.gateVisible || snapshot.automationCardVisible).toBe(true);
-    });
-  }, 45_000);
-
-  test('renders the Orbit Open artifact link as a desktop new-tab link when a live artifact target exists', async () => {
-    await seedDesktopConfig(desktop, {
-      mode: 'api',
-      apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4o',
-      apiProtocol: 'openai',
-      apiProviderBaseUrl: 'https://api.openai.com/v1',
-      agentId: null,
-      skillId: null,
-      designSystemId: null,
-      composio: { apiKeyConfigured: true },
-      orbit: {
-        enabled: false,
-        time: '09:00',
-        templateSkillId: 'orbit-general',
-      },
-      onboardingCompleted: true,
-      mediaProviders: {},
-      agentModels: {},
-      theme: 'system',
-    }, 'model');
-
-    await desktop.eval(`
-      (() => {
-        const originalFetch = window.fetch.bind(window);
-        window.fetch = async (input, init) => {
-          const url = typeof input === 'string'
-            ? input
-            : input instanceof Request
-              ? input.url
-              : String(input);
-          if (url === '/api/orbit/status') {
-            return new Response(JSON.stringify({
-              running: false,
-              nextRunAt: null,
-              lastRun: {
-                completedAt: '2026-05-06T10:00:00.000Z',
-                trigger: 'manual',
-                templateSkillId: 'orbit-general',
-                connectorsChecked: 5,
-                connectorsSucceeded: 3,
-                connectorsSkipped: 2,
-                connectorsFailed: 0,
-                markdown: 'General latest summary',
-                artifactId: 'artifact-123',
-                artifactProjectId: 'project-456',
-              },
-              lastRunsByTemplate: {
-                'orbit-general': {
-                  completedAt: '2026-05-06T10:00:00.000Z',
-                  trigger: 'manual',
-                  templateSkillId: 'orbit-general',
-                  connectorsChecked: 5,
-                  connectorsSucceeded: 3,
-                  connectorsSkipped: 2,
-                  connectorsFailed: 0,
-                  markdown: 'General latest summary',
-                  artifactId: 'artifact-123',
-                  artifactProjectId: 'project-456',
-                },
-              },
-            }), {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' },
-            });
-          }
-          return originalFetch(input, init);
-        };
-        return true;
-      })()
-    `);
-
-    await desktop.openSettings();
-    await openDesktopSettingsSection(desktop, 'Orbit');
-
-    await waitFor(async () => {
-      const snapshot = await readDesktopOrbitSnapshot(desktop);
-      expect(snapshot.dialogOpen).toBe(true);
-      expect(snapshot.heading).toBe('Orbit');
-      expect(snapshot.sectionTitle).toBe('Orbit');
-      expect(snapshot.openArtifactHref).toBe('/api/live-artifacts/artifact-123/preview?projectId=project-456');
-      expect(snapshot.openArtifactTarget).toBe('_blank');
-      expect(snapshot.openArtifactRel).toContain('noreferrer');
-    });
-  }, 45_000);
-
-  test('clicking the Orbit Open artifact link keeps the desktop settings dialog stable', async () => {
-    await seedDesktopConfig(desktop, {
-      mode: 'api',
-      apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4o',
-      apiProtocol: 'openai',
-      apiProviderBaseUrl: 'https://api.openai.com/v1',
-      agentId: null,
-      skillId: null,
-      designSystemId: null,
-      composio: { apiKeyConfigured: true },
-      orbit: {
-        enabled: false,
-        time: '09:00',
-        templateSkillId: 'orbit-general',
-      },
-      onboardingCompleted: true,
-      mediaProviders: {},
-      agentModels: {},
-      theme: 'system',
-    }, 'model');
-
-    await desktop.eval(`
-      (() => {
-        const originalFetch = window.fetch.bind(window);
-        window.fetch = async (input, init) => {
-          const url = typeof input === 'string'
-            ? input
-            : input instanceof Request
-              ? input.url
-              : String(input);
-          if (url === '/api/orbit/status') {
-            return new Response(JSON.stringify({
-              running: false,
-              nextRunAt: null,
-              lastRun: {
-                completedAt: '2026-05-06T10:00:00.000Z',
-                trigger: 'manual',
-                templateSkillId: 'orbit-general',
-                connectorsChecked: 5,
-                connectorsSucceeded: 3,
-                connectorsSkipped: 2,
-                connectorsFailed: 0,
-                markdown: 'General latest summary',
-                artifactId: 'artifact-123',
-                artifactProjectId: 'project-456',
-              },
-              lastRunsByTemplate: {
-                'orbit-general': {
-                  completedAt: '2026-05-06T10:00:00.000Z',
-                  trigger: 'manual',
-                  templateSkillId: 'orbit-general',
-                  connectorsChecked: 5,
-                  connectorsSucceeded: 3,
-                  connectorsSkipped: 2,
-                  connectorsFailed: 0,
-                  markdown: 'General latest summary',
-                  artifactId: 'artifact-123',
-                  artifactProjectId: 'project-456',
-                },
-              },
-            }), {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' },
-            });
-          }
-          return originalFetch(input, init);
-        };
-        window.__odLastOpenArtifactHref = null;
-        window.__odOpenArtifactClickCount = 0;
-        if (!window.__odOpenArtifactClickCaptureInstalled) {
-          document.addEventListener('click', (event) => {
-            const target = event.target instanceof Element ? event.target.closest('a') : null;
-            if (!(target instanceof HTMLAnchorElement)) return;
-            if (target.textContent?.trim() !== 'Open artifact') return;
-            window.__odLastOpenArtifactHref = target.getAttribute('href');
-            window.__odOpenArtifactClickCount += 1;
-            event.preventDefault();
-          }, true);
-          window.__odOpenArtifactClickCaptureInstalled = true;
-        }
-        return true;
-      })()
-    `);
-
-    await desktop.openSettings();
-    await openDesktopSettingsSection(desktop, 'Orbit');
-
-    await waitFor(async () => {
-      const snapshot = await readDesktopOrbitSnapshot(desktop);
-      expect(snapshot.openArtifactHref).toBe('/api/live-artifacts/artifact-123/preview?projectId=project-456');
-    });
-
-    const clicked = await desktop.eval<boolean>(`
-      (() => {
-        const link = Array.from(document.querySelectorAll('a'))
-          .find((node) => node.textContent?.trim() === 'Open artifact');
-        if (!(link instanceof HTMLAnchorElement)) return false;
-        link.click();
-        return true;
-      })()
-    `);
-    expect(clicked).toBe(true);
-
-    await waitFor(async () => {
-      const snapshot = await readDesktopOrbitSnapshot(desktop);
-      expect(snapshot.dialogOpen).toBe(true);
-      expect(snapshot.heading).toBe('Orbit');
-      expect(snapshot.sectionTitle).toBe('Orbit');
-      expect(snapshot.openArtifactHref).toBe('/api/live-artifacts/artifact-123/preview?projectId=project-456');
-    });
-
-    const clickCapture = await desktop.eval<{ count: number; href: string | null }>(`
-      (() => ({
-        count: typeof window.__odOpenArtifactClickCount === 'number' ? window.__odOpenArtifactClickCount : 0,
-        href: typeof window.__odLastOpenArtifactHref === 'string' ? window.__odLastOpenArtifactHref : null,
-      }))()
-    `);
-    expect(clickCapture.count).toBeGreaterThan(0);
-    expect(clickCapture.href).toBe('/api/live-artifacts/artifact-123/preview?projectId=project-456');
-  }, 45_000);
-
   test('keeps the desktop workspace stable when the artifact Open link is clicked', async () => {
     await seedDesktopConfig(desktop, {
       mode: 'api',
@@ -1774,56 +1598,6 @@ desktopMacDescribe('mac desktop settings smoke', () => {
     `);
     expect(clickCapture.count).toBeGreaterThan(0);
     expect(clickCapture.href).toBe('/api/projects/' + seeded.projectId + '/raw/desktop-open.html?v=0&r=0');
-  }, 45_000);
-
-  test('routes the Orbit gate CTA to the Connectors section inside the desktop shell', async () => {
-    await seedDesktopConfig(desktop, {
-      mode: 'api',
-      apiKey: 'sk-test',
-      baseUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4o',
-      apiProtocol: 'openai',
-      apiProviderBaseUrl: 'https://api.openai.com/v1',
-      agentId: null,
-      skillId: null,
-      designSystemId: null,
-      composio: { apiKeyConfigured: false },
-      orbit: {
-        enabled: false,
-        time: '09:00',
-        templateSkillId: 'orbit-general',
-      },
-      onboardingCompleted: true,
-      mediaProviders: {},
-      agentModels: {},
-      theme: 'system',
-    }, 'model');
-
-    await desktop.openSettings();
-    await openDesktopSettingsSection(desktop, 'Orbit');
-
-    await waitFor(async () => {
-      const snapshot = await readDesktopOrbitSnapshot(desktop);
-      expect(snapshot.gateVisible).toBe(true);
-    });
-
-    const clicked = await desktop.eval<boolean>(`
-      (() => {
-        const action = document.querySelector('[data-testid="orbit-config-gate-action"]');
-        if (!(action instanceof HTMLElement)) return false;
-        action.click();
-        return true;
-      })()
-    `);
-    expect(clicked).toBe(true);
-
-    await waitFor(async () => {
-      const snapshot = await readDesktopConnectorsSnapshot(desktop);
-      expect(snapshot.dialogOpen).toBe(true);
-      expect(snapshot.heading).toBe('Connectors');
-      expect(snapshot.sectionTitle).toBe('Connectors');
-      expect(snapshot.apiKeyLabelVisible).toBe(true);
-    });
   }, 45_000);
 
   test('opens the Media providers section from the desktop shell and shows provider controls', async () => {
@@ -2081,18 +1855,6 @@ type DesktopConnectorsSnapshot = {
   sectionTitle: string | null;
 };
 
-type DesktopOrbitSnapshot = {
-  automationCardVisible: boolean;
-  dialogOpen: boolean;
-  gateVisible: boolean;
-  heading: string | null;
-  openArtifactHref: string | null;
-  openArtifactRel: string | null;
-  openArtifactTarget: string | null;
-  runButtonVisible: boolean;
-  sectionTitle: string | null;
-};
-
 type DesktopMediaSnapshot = {
   dialogOpen: boolean;
   heading: string | null;
@@ -2315,31 +2077,6 @@ async function readDesktopConnectorsSnapshot(
   `);
 }
 
-async function readDesktopOrbitSnapshot(
-  desktop: DesktopHarness,
-): Promise<DesktopOrbitSnapshot> {
-  return await desktop.eval<DesktopOrbitSnapshot>(`
-    (() => {
-      const sectionTitle = document.querySelector('.orbit-section .orbit-hero-title')
-        ?.textContent?.trim() ?? null;
-      const openArtifactLink = Array.from(document.querySelectorAll('a'))
-        .find((node) => node.textContent?.trim() === 'Open artifact');
-      return {
-        automationCardVisible: Boolean(document.querySelector('[data-testid="orbit-automation-card"]')),
-        dialogOpen: Boolean(document.querySelector('[role="dialog"]')),
-        gateVisible: Boolean(document.querySelector('[data-testid="orbit-config-gate"]')),
-        heading: document.querySelector('[role="dialog"] h2')?.textContent?.trim() ?? null,
-        openArtifactHref: openArtifactLink?.getAttribute('href') ?? null,
-        openArtifactRel: openArtifactLink?.getAttribute('rel') ?? null,
-        openArtifactTarget: openArtifactLink?.getAttribute('target') ?? null,
-        runButtonVisible: Boolean(Array.from(document.querySelectorAll('button'))
-          .find((node) => node.textContent?.trim() === 'Run it now')),
-        sectionTitle,
-      };
-    })()
-  `);
-}
-
 async function readDesktopMediaSnapshot(
   desktop: DesktopHarness,
 ): Promise<DesktopMediaSnapshot> {
@@ -2484,6 +2221,62 @@ async function waitForHealthyDesktop(): Promise<MacInspectResult> {
   }
 
   throw new Error(`packaged mac runtime did not become healthy: ${formatUnknown(lastResult)}`);
+}
+
+async function waitForPackagedHomeFirstRunOutput(): Promise<PackagedHomeFirstRunResult> {
+  const timeoutMs = 15_000;
+  const startedAt = Date.now();
+  let lastResult: unknown = null;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const inspect = await runToolsPackJson<MacInspectResult>('inspect', [
+      '--expr',
+      packagedHomeFirstRunSnapshotExpression(),
+    ]);
+    lastResult = inspect;
+    if (inspect.eval?.ok === true) {
+      const snapshot = assertPackagedHomeFirstRunResult(inspect.eval.value);
+      lastResult = snapshot;
+      if (
+        snapshot.assistantText.includes(PACKAGED_HOME_FIRST_RUN_OUTPUT)
+        && snapshot.daemonAssistantText.includes(PACKAGED_HOME_FIRST_RUN_OUTPUT)
+        && snapshot.runEventsContainExpectedOutput
+      ) {
+        return snapshot;
+      }
+    }
+    await delay(750);
+  }
+
+  throw new Error(
+    `packaged first Home run did not render assistant output without recovery: ${formatUnknown(lastResult)}`,
+  );
+}
+
+async function waitForPackagedHomeFirstRunSubmit(): Promise<void> {
+  const timeoutMs = 15_000;
+  const startedAt = Date.now();
+  let lastResult: unknown = null;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const inspect = await runToolsPackJson<MacInspectResult>('inspect', [
+      '--expr',
+      packagedHomeFirstRunSubmitExpression(),
+    ]);
+    lastResult = inspect;
+    if (
+      inspect.eval?.ok === true
+      && isRecord(inspect.eval.value)
+      && inspect.eval.value.submitClicked === true
+    ) {
+      return;
+    }
+    await delay(250);
+  }
+
+  throw new Error(
+    `packaged first Home run submit never became ready: ${formatUnknown(lastResult)}`,
+  );
 }
 
 async function waitForHealthyDesktopVersion(
@@ -2941,7 +2734,7 @@ async function assertMacInviteProtocolRegistration(installedAppPath: string): Pr
 
 async function invokeMacInviteDeeplink(installedAppPath: string): Promise<void> {
   // `-a` pins delivery to this namespace's installed test bundle instead of a
-  // developer's stable Open Design app that may own the same global scheme.
+  // developer's stable OpenDesign app that may own the same global scheme.
   await execFileAsync('/usr/bin/open', ['-a', installedAppPath, packagedInviteDeeplink]);
 }
 
@@ -2959,9 +2752,31 @@ async function fileSizeBytes(filePath: string): Promise<number> {
 }
 
 async function seedPackagedOnboardingComplete(): Promise<void> {
+  await seedPackagedAppConfig({ onboardingCompleted: true });
+}
+
+async function seedPackagedHomeFirstRunConfig(
+  codexEnv: Record<string, string>,
+): Promise<void> {
+  await seedPackagedAppConfig({
+    mode: 'daemon',
+    apiKey: '',
+    baseUrl: 'https://api.anthropic.com',
+    model: 'claude-sonnet-4-5',
+    agentId: 'codex',
+    skillId: null,
+    designSystemId: null,
+    onboardingCompleted: true,
+    mediaProviders: {},
+    agentModels: { codex: { model: 'default', reasoning: 'default' } },
+    agentCliEnv: { codex: codexEnv },
+  });
+}
+
+async function seedPackagedAppConfig(config: Record<string, unknown>): Promise<void> {
   const configPath = join(runtimeNamespaceRoot, 'data', 'app-config.json');
   await mkdir(dirname(configPath), { recursive: true });
-  await writeFile(configPath, `${JSON.stringify({ onboardingCompleted: true }, null, 2)}\n`, 'utf8');
+  await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
 }
 
 async function resetPackagedMacRuntimeData(): Promise<void> {

@@ -60,7 +60,7 @@ export type TrackingAmrEntrySource =
   | 'inline_model_switcher_amr_row'
   | 'settings_amr_agent_card'
   | 'settings_amr_authorize'
-  // The 'use Open Design Cloud' callout on the execution tab. Same device-auth
+  // The 'use OpenDesign Cloud' callout on the execution tab. Same device-auth
   // flow as settings_amr_authorize, kept distinct so the two entry points stay
   // separable in funnel analysis.
   | 'settings_cloud_callout'
@@ -91,7 +91,10 @@ export type TrackingAmrEntrySource =
   | 'artifact_success_upgrade'
   | 'home_artifact_upgrade';
 
-export type TrackingCampaignId = 'deepseek_v4_flash';
+// `deepseek_v4_flash` is the finished 8/6-8/13 free week; `deepseek_v4_pro`
+// is the 8/13-8/27 two-model window that follows it. Both stay declared so
+// the finished campaign's rows keep a valid id in the warehouse.
+export type TrackingCampaignId = 'deepseek_v4_flash' | 'deepseek_v4_pro';
 export type TrackingCampaignUserState = 'paid' | 'unpaid';
 export type TrackingCampaignConversionSource =
   | 'deepseek_unpaid_modal'
@@ -111,7 +114,7 @@ export interface AmrEntryAttribution {
   // Stripe payment result can be attributed without replacing first touch.
   campaignId?: TrackingCampaignId;
   conversionSource?: TrackingCampaignConversionSource;
-  // Open Design install/device id forwarded only on consent-gated AMR handoffs.
+  // OpenDesign install/device id forwarded only on consent-gated AMR handoffs.
   odDeviceId?: string;
   // Self-reported onboarding profile, forwarded to AMR (anchored to entryId) so
   // AMR can segment paid conversion by who the visitor is. Open strings, not a
@@ -167,12 +170,17 @@ export type TrackingByokProviderId =
 // v2 CLI provider catalogue (CSV row 63 + image 59). Adds `qoder_cli` and
 // `kilo` over v1, plus `amr` (the vela CLI runtime) so AMR runs no longer
 // fold into the `other` catch-all bucket.
+// Every agent the daemon can detect needs its own id here. An agent that falls
+// through to `other` is invisible to any breakdown or alert that asks *which*
+// CLI failed — which is the only question worth asking when an install someone
+// followed our own instructions for cannot be used.
 export type TrackingCliProviderId =
   | 'claude_code'
   | 'codex_cli'
   | 'devin_for_terminal'
   | 'gemini_cli'
   | 'opencode'
+  | 'byok_opencode'
   | 'hermes'
   | 'kimi_cli'
   | 'cursor_agent'
@@ -181,6 +189,19 @@ export type TrackingCliProviderId =
   | 'github_copilot_cli'
   | 'pi'
   | 'kilo'
+  | 'kiro'
+  | 'vibe'
+  | 'amp'
+  | 'aider'
+  | 'trae_cli'
+  | 'grok_build'
+  | 'antigravity'
+  | 'codebuddy'
+  | 'reasonix'
+  | 'mimo'
+  | 'atomcode'
+  | 'deepseek'
+  | 'deepseek_harness'
   | 'amr'
   | 'other';
 
@@ -214,7 +235,21 @@ export type TrackingExportFormat =
 
 export type TrackingResult = 'success' | 'failed';
 export type TrackingRunResult = 'success' | 'failed' | 'cancelled';
+export type TrackingRunCancelOrigin =
+  | 'user_stop'
+  | 'project_cleanup'
+  | 'daemon_shutdown'
+  | 'unknown';
+export type TrackingRunTerminalTrigger =
+  | TrackingRunCancelOrigin
+  | 'first_output_deadline'
+  | 'inactivity_watchdog'
+  | 'daemon_restart';
 export type TrackingExportResult = 'success' | 'failed' | 'cancelled';
+// Stable codes for artifact_publish_result.error_code. Deliberately a CLOSED
+// set — unlike artifact_deploy_result's open-ended provider/HTTP codes — so no
+// free-form message text can ever be passed as an analytics error code.
+export type TrackingPublishErrorCode = 'workspace_identity_required' | 'publish_failed';
 export type TrackingTestResult = 'success' | 'failed' | 'timeout';
 export type TrackingRunFailureCategory =
   | 'auth'
@@ -237,6 +272,12 @@ export type TrackingRunFailureDetail =
   | 'missing_api_key'
   | 'invalid_api_key'
   | 'hard_quota'
+  // A rolling per-model usage window (vela's 5-hour `model_limit_exceeded`)
+  // that resets on its own at a known instant. Distinct from `hard_quota`:
+  // nothing was charged, nothing needs topping up, and the same request
+  // succeeds once the window rolls over — so it stays retryable and must not
+  // be counted as a quota exhaustion in reliability reporting.
+  | 'model_window_limit'
   | 'workspace_credits_exhausted'
   | 'rate_limit_429'
   | 'amr_insufficient_balance'
@@ -425,6 +466,7 @@ export type TrackingLangfuseDropReason =
   | 'content_consent_off'
   | 'missing_sink_config'
   | 'payload_too_large'
+  | 'task_hierarchy_rollout'
   | 'relay_429'
   | 'relay_413'
   | 'relay_5xx'

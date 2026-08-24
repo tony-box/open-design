@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useAnalytics } from '../analytics/provider';
 import { trackFileManagerClick } from '../analytics/events';
 import { useT } from '../i18n';
@@ -675,6 +675,23 @@ export function DesignFilesPanel({
       />
     ) : null;
 
+  // One pass over the full file list replaces renderDirRow's previous
+  // per-directory `files.filter(...)`. The visible count is unchanged, but a
+  // directory-heavy project now costs O(files + directories), not
+  // O(files * directories), on every panel render.
+  const descendantFileCountByDir = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const file of files) {
+      const parts = file.name.split('/');
+      let dir = '';
+      for (let index = 0; index < parts.length - 1; index += 1) {
+        dir = dir ? `${dir}/${parts[index]}` : parts[index]!;
+        counts.set(dir, (counts.get(dir) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [files]);
+
   // Prune selections that no longer exist in the current file list
   // (e.g. after a refresh or delete within the same project).
   // Cross-project leaks are handled by the parent remounting this
@@ -1193,8 +1210,7 @@ export function DesignFilesPanel({
 
   function renderDirRow(dirName: string) {
     const fullPath = currentDir === '' ? dirName : `${currentDir}/${dirName}`;
-    const prefix = `${fullPath}/`;
-    const count = files.filter((f) => f.name.startsWith(prefix)).length;
+    const count = descendantFileCountByDir.get(fullPath) ?? 0;
     return (
       <div key={`dir:${fullPath}`} className="df-row df-dir-row" onClick={() => setCurrentDir(fullPath)}>
         <span className="df-row-check" aria-hidden />
@@ -1728,7 +1744,7 @@ export function DesignFilesPanel({
                               void handlePluginFolderAgentAction(folder.path, 'contribute')
                             }
                           >
-                            {sharingFolder === `contribute:${folder.path}` ? 'Sending…' : 'Open Design PR'}
+                            {sharingFolder === `contribute:${folder.path}` ? 'Sending…' : 'OpenDesign PR'}
                           </button>
                         </div>
                       ) : null}
@@ -2053,17 +2069,19 @@ function HtmlCardThumbnail({
     url,
   ]);
 
-  // Track the host width so the fixed-layout iframe scales with the card.
-  // Environments without ResizeObserver (jsdom) fall back to an unscaled
-  // fill-the-box iframe.
-  useEffect(() => {
+  // Track the host width before paint so the iframe's first rendered viewport
+  // is the fixed desktop layout, then only its outer transform follows the
+  // card. This prevents responsive decks from fitting once to the card-sized
+  // iframe and then being scaled a second time after ResizeObserver runs.
+  useLayoutEffect(() => {
     const host = hostRef.current;
-    if (!host || typeof ResizeObserver === 'undefined') return;
+    if (!host) return;
     const update = () => {
       const width = host.clientWidth;
       if (width > 0) setScale(width / PAGE_THUMB_LAYOUT_WIDTH);
     };
     update();
+    if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(update);
     observer.observe(host);
     return () => observer.disconnect();
@@ -2079,16 +2097,16 @@ function HtmlCardThumbnail({
           srcDoc={srcDoc}
           sandbox="allow-scripts allow-downloads"
           loading="lazy"
-          style={
-            scale
+          style={{
+            width: PAGE_THUMB_LAYOUT_WIDTH,
+            height: PAGE_THUMB_LAYOUT_HEIGHT,
+            ...(scale
               ? {
-                  width: PAGE_THUMB_LAYOUT_WIDTH,
-                  height: PAGE_THUMB_LAYOUT_HEIGHT,
                   transform: `scale(${scale})`,
                   transformOrigin: '0 0',
                 }
-              : undefined
-          }
+              : {}),
+          }}
         />
       )}
     </div>

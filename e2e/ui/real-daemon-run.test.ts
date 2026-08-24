@@ -25,6 +25,18 @@ const DELAYED_HEADING = 'Delayed Daemon Smoke';
 const SLOW_RELOAD_FILE = 'slow-reload-daemon-smoke.html';
 const SLOW_RELOAD_HEADING = 'Slow Reload Daemon Smoke';
 const FOLLOW_UP_FILE = 'follow-up-daemon-smoke.html';
+const OD_NEXT_CANARY_FILE = 'od-next-active-canary.html';
+const MEDIA_ONLY_FILE = 'media-only.png';
+const SERVER_DERIVED_WORKSPACE_HEADERS = {
+  'x-od-workspace-id': 'e2e-server-derived-workspace',
+  'x-od-workspace-type': 'personal',
+  'x-od-workspace-member-id': 'e2e-server-derived-member',
+  'x-od-workspace-role': 'owner',
+  'x-od-workspace-member-status': 'active',
+  'x-od-workspace-lifecycle-state': 'active',
+  'x-od-workspace-can-share-projects': 'true',
+  'x-od-workspace-can-write-synced-files': 'true',
+} as const;
 let fakeRuntimes: Awaited<ReturnType<typeof createFakeAgentRuntimes>>;
 
 function artifactPreview(page: Page) {
@@ -103,6 +115,195 @@ test('[P0] real daemon run streams, persists, and previews an artifact', async (
   await expect(artifactPreview(page)).toBeVisible();
   await expect(artifactPreviewFrame(page).getByRole('heading', { name: GENERATED_HEADING })).toBeVisible();
   await expectProjectFileToContain(page, projectId, GENERATED_FILE, GENERATED_HEADING);
+});
+
+test('[P0] local OD Next active canary follows one public task across physical runs', async ({ page }) => {
+  test.skip(
+    process.env.OD_NEXT_STRATEGY_ROLLOUT !== 'active'
+      || process.env.OD_NEXT_STRATEGY_LOCAL_SYNTHETIC_CANARY !== '1',
+    'requires the explicit local synthetic rollout canary flags',
+  );
+  await prepareLocalOdNextCanary(page, 'OD Next local active canary');
+
+  const createResponsePromise = page.waitForResponse(isCreateRunResponse);
+  await sendPrompt(page, 'Create an OD Next active canary artifact');
+  const createResponse = await createResponsePromise;
+  const created = await createResponse.json() as {
+    runId: string;
+    taskExecutionId?: string;
+    strategyTask?: { taskExecutionId: string; inputStage: string; terminal: boolean };
+  };
+  expect(created.strategyTask).toMatchObject({ inputStage: 'request', terminal: false });
+  expect(created.taskExecutionId).toBe(created.strategyTask?.taskExecutionId);
+
+  const { projectId } = await currentProjectContext(page);
+  await expectProjectFilesToContain(page, projectId, [OD_NEXT_CANARY_FILE]);
+  await expect(page.getByText(
+    'Created od-next-active-canary.html through the continued native session.',
+  ).last()).toBeVisible();
+
+  await expect.poll(async () => {
+    const response = await page.request.get(`/api/runs/${created.runId}`);
+    const status = await response.json() as {
+      strategyTask?: {
+        activeRunId: string;
+        inputStage: string;
+        outcome: string;
+        terminal: boolean;
+      };
+    };
+    return status.strategyTask;
+  }, { timeout: 20_000 }).toMatchObject({
+    inputStage: 'production',
+    outcome: 'completed',
+    terminal: true,
+    activeRunId: expect.not.stringMatching(new RegExp(`^${created.runId}$`)),
+  });
+
+  const list = await page.request.get(`/api/runs?projectId=${encodeURIComponent(projectId)}`);
+  const body = await list.json() as {
+    runs: Array<{ strategyTask?: { taskExecutionId: string } }>;
+  };
+  expect(body.runs.filter((run) => (
+    run.strategyTask?.taskExecutionId === created.taskExecutionId
+  ))).toHaveLength(2);
+});
+
+test('[P0] local OD Next clarification canary preserves one taskExecutionId through the public form', async ({ page }) => {
+  test.skip(
+    process.env.OD_NEXT_STRATEGY_ROLLOUT !== 'active'
+      || process.env.OD_NEXT_STRATEGY_LOCAL_SYNTHETIC_CANARY !== '1',
+    'requires the explicit local synthetic rollout canary flags',
+  );
+  await prepareLocalOdNextCanary(page, 'OD Next local clarification canary');
+
+  const createResponsePromise = page.waitForResponse(isCreateRunResponse);
+  await sendPrompt(page, 'Create an OD Next clarification canary artifact');
+  const created = await (await createResponsePromise).json() as {
+    runId: string;
+    taskExecutionId: string;
+  };
+  await expect.poll(async () => {
+    const response = await page.request.get(`/api/runs/${created.runId}`);
+    return (await response.json() as { strategyTask?: { outcome: string } }).strategyTask?.outcome;
+  }, { timeout: 20_000 }).toBe('clarification_required');
+
+  const form = page.locator('.question-form').first();
+  await expect(form).toBeVisible();
+  await form.getByText('Desktop web', { exact: true }).click();
+  const clarificationResponsePromise = page.waitForResponse(isCreateRunResponse);
+  await form.getByRole('button', { name: 'Send answers' }).click();
+  const clarificationResponse = await clarificationResponsePromise;
+  const clarificationText = await clarificationResponse.text();
+  expect(clarificationResponse.ok(), clarificationText).toBeTruthy();
+  const clarification = JSON.parse(clarificationText) as {
+    taskExecutionId: string;
+    strategyTask?: { inputStage: string };
+  };
+  expect(clarification.taskExecutionId).toBe(created.taskExecutionId);
+  expect(clarification.strategyTask?.inputStage).toBe('clarification');
+
+  const { projectId } = await currentProjectContext(page);
+  await expectProjectFilesToContain(page, projectId, [OD_NEXT_CANARY_FILE]);
+  await expect(page.getByText(
+    'Created od-next-active-canary.html through the continued native session.',
+  ).last()).toBeVisible();
+  await expect.poll(async () => {
+    const response = await page.request.get(`/api/runs/${created.runId}`);
+    return (await response.json() as {
+      strategyTask?: { taskExecutionId: string; outcome: string; terminal: boolean };
+    }).strategyTask;
+  }, { timeout: 20_000 }).toMatchObject({
+    taskExecutionId: created.taskExecutionId,
+    outcome: 'completed',
+    terminal: true,
+  });
+});
+
+test('[P0] local OD Next public canaries project blocked and canceled terminal mappings', async ({ page }) => {
+  test.skip(
+    process.env.OD_NEXT_STRATEGY_ROLLOUT !== 'active'
+      || process.env.OD_NEXT_STRATEGY_LOCAL_SYNTHETIC_CANARY !== '1',
+    'requires the explicit local synthetic rollout canary flags',
+  );
+  await prepareLocalOdNextCanary(page, 'OD Next local blocked canary');
+  const blockedResponsePromise = page.waitForResponse(isCreateRunResponse);
+  await sendPrompt(page, 'Create an OD Next blocked canary');
+  const blocked = await (await blockedResponsePromise).json() as {
+    runId: string;
+    taskExecutionId: string;
+  };
+  await expect.poll(async () => {
+    const response = await page.request.get(`/api/runs/${blocked.runId}`);
+    return (await response.json() as {
+      strategyTask?: { taskExecutionId: string; outcome: string; terminal: boolean };
+    }).strategyTask;
+  }, { timeout: 20_000 }).toMatchObject({
+    taskExecutionId: blocked.taskExecutionId,
+    outcome: 'blocked',
+    terminal: true,
+  });
+
+  await prepareLocalOdNextCanary(page, 'OD Next local canceled canary');
+  const canceledResponsePromise = page.waitForResponse(isCreateRunResponse);
+  await sendPrompt(page, 'Hold the daemon run open until canceled');
+  const canceled = await (await canceledResponsePromise).json() as {
+    runId: string;
+    taskExecutionId: string;
+  };
+  const cancelResponse = await page.request.post(`/api/runs/${canceled.runId}/cancel`);
+  expect(cancelResponse.ok(), await cancelResponse.text()).toBeTruthy();
+  await expect.poll(async () => {
+    const response = await page.request.get(`/api/runs/${canceled.runId}`);
+    return (await response.json() as {
+      strategyTask?: { taskExecutionId: string; outcome: string; terminal: boolean };
+    }).strategyTask;
+  }, { timeout: 20_000 }).toMatchObject({
+    taskExecutionId: canceled.taskExecutionId,
+    outcome: 'canceled',
+    terminal: true,
+  });
+});
+
+test('[P0] bound project reads derive Workspace authority without browser query scope', async ({ page }) => {
+  const projectId = `server-derived-raw-${Date.now()}`;
+  const { conversationId } = await createProjectViaApi(
+    page,
+    projectId,
+    'Server-derived raw authority',
+    undefined,
+    SERVER_DERIVED_WORKSPACE_HEADERS,
+  );
+
+  expect(conversationId).toBeTruthy();
+  const conversationsResponse = await page.request.get(
+    `/api/projects/${projectId}/conversations`,
+  );
+  expect(
+    conversationsResponse.ok(),
+    await conversationsResponse.text(),
+  ).toBeTruthy();
+  const messagesResponse = await page.request.get(
+    `/api/projects/${projectId}/conversations/${conversationId}/messages`,
+  );
+  expect(messagesResponse.ok(), await messagesResponse.text()).toBeTruthy();
+
+  const writeResponse = await page.request.post(`/api/projects/${projectId}/files`, {
+    headers: SERVER_DERIVED_WORKSPACE_HEADERS,
+    data: {
+      name: GENERATED_FILE,
+      content: `<!doctype html><html><body><h1>${GENERATED_HEADING}</h1></body></html>`,
+    },
+  });
+  expect(writeResponse.ok(), await writeResponse.text()).toBeTruthy();
+
+  const rawPath = `/api/projects/${projectId}/raw/${GENERATED_FILE}`;
+  const response = await page.goto(rawPath, { waitUntil: 'domcontentloaded' });
+  expect(response?.ok(), await response?.text()).toBeTruthy();
+  expect(new URL(page.url()).searchParams.has('workspaceId')).toBe(false);
+  expect(new URL(page.url()).searchParams.has('workspaceMemberId')).toBe(false);
+  await expect(page.getByRole('heading', { name: GENERATED_HEADING })).toBeVisible();
+  await expect(page.locator('body')).not.toContainText('WORKSPACE_CONTEXT_REQUIRED');
 });
 
 test('[P0] real daemon run persists an artifact streamed across multiple chunks', async ({ page }) => {
@@ -216,12 +417,11 @@ test('[P1] real daemon run treats an in-place artifact edit as produced work', a
   await expect(editedHeading).toBeVisible();
   await editedHeading.click();
   await expect(editedHeading).toHaveAttribute('data-od-edit-selected', 'true');
-  await page.getByTestId('manual-edit-open-inspector').click();
   const fontSizeInput = page
     .locator('.manual-edit-modal .cc-section')
-    .filter({ hasText: 'TYPOGRAPHY' })
+    .filter({ hasText: 'Parameters' })
     .locator('.cc-row')
-    .filter({ hasText: 'Size' })
+    .filter({ hasText: 'Font size' })
     .locator('input');
   await fontSizeInput.fill('52');
   await page.locator('.manual-edit-modal').getByRole('button', { name: /^Save$/ }).click({ force: true });
@@ -249,17 +449,45 @@ test('[P1] Plan mode daemon run creates, opens, and restores an editable markdow
   await expectProjectFilesToContain(page, projectId, ['plan.md']);
   await expectProjectFileToContain(page, projectId, 'plan.md', '# Deterministic Plan');
   await expect(page.getByTestId('file-workspace').getByRole('tab', { name: /plan\.md/i })).toBeVisible();
+  await page.getByRole('tab', { name: 'Code', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /markdown editor/i })).toHaveValue(/Deterministic Plan/);
-  await expect(page.getByLabel(/markdown preview/i)).toContainText('Scope');
   await expect(page.getByTestId('chat-composer')).toBeVisible();
   await expect(page.getByTestId('chat-composer-input')).toBeVisible();
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expectWorkspaceReady(page);
   await expect(page.getByTestId('file-workspace').getByRole('tab', { name: /plan\.md/i })).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('tab', { name: 'Code', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /markdown editor/i })).toHaveValue(/Deterministic Plan/);
-  await expect(page.getByLabel(/markdown preview/i)).toContainText('Keep the plan editable');
   await expect(page.getByTestId('chat-composer')).toBeVisible();
+});
+
+test('[P1] media-only turn auto-opens the generated image file', async ({ page }) => {
+  await createProject(page, 'Media-only auto-open smoke');
+  await expectWorkspaceReady(page);
+
+  // Establish an already-active project file first. Otherwise the workspace's
+  // one-time initial-primary-file fallback can open the first project file and
+  // mask whether turn-end media selection actually works.
+  await sendPrompt(page, 'Create a deterministic plan document');
+  const workspace = page.getByTestId('file-workspace');
+  await expect(workspace.getByRole('tab', { name: /plan\.md/i })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+
+  await sendPrompt(page, 'Create a deterministic media-only artifact');
+
+  const mediaTab = workspace.getByRole('tab', { name: /media-only\.png/i });
+  await expect(mediaTab).toBeVisible({ timeout: T.medium });
+  await expect(mediaTab).toHaveAttribute('aria-selected', 'true');
+  await expect(workspace.getByRole('img', { name: MEDIA_ONLY_FILE })).toBeVisible();
+
+  const rawHref = await workspace.getByRole('link', { name: 'Open' }).getAttribute('href');
+  if (!rawHref) throw new Error('media preview did not expose its raw file URL');
+  const rawResponse = await page.request.get(rawHref);
+  expect(rawResponse.ok(), await rawResponse.text()).toBeTruthy();
+  expect(rawResponse.headers()['content-type']).toContain('image/png');
 });
 
 // Red spec for "Plan 模式生成 HTML 后没有自动打开生成的文件": after the user
@@ -283,6 +511,7 @@ test('[P1] Plan mode generation turn auto-opens the generated HTML file', async 
   // markdown plan in the split editor (autosave on) before asking for the
   // final deliverable.
   const planEditor = page.getByRole('textbox', { name: /markdown editor/i });
+  await page.getByRole('tab', { name: 'Code', exact: true }).click();
   await expect(planEditor).toHaveValue(/Deterministic Plan/);
   await planEditor.click();
   await planEditor.press('End');
@@ -292,7 +521,7 @@ test('[P1] Plan mode generation turn auto-opens the generated HTML file', async 
   await sendPrompt(page, 'Generate the deterministic artifact from the plan document');
   await expectProjectFilesToContain(page, projectId, ['index.html', 'plan.md']);
   const htmlTab = page.getByTestId('file-workspace').getByRole('tab', { name: /index\.html/i });
-  await expect(htmlTab).toBeVisible({ timeout: 15_000 });
+  await expect(htmlTab).toBeVisible({ timeout: 2_000 });
   await expect(htmlTab).toHaveAttribute('aria-selected', 'true');
 });
 
@@ -581,6 +810,7 @@ test('[P0] real daemon run previews an artifact from a fake OpenCode runtime', a
 test('[P1] BYOK OpenCode run is blocked before spawn when provider config is missing', async ({ page }) => {
   await createByokOpenCodeProject(page, 'BYOK OpenCode missing provider smoke');
   await expectWorkspaceReady(page);
+  const projectUrl = page.url();
 
   // The client-side BYOK preflight (apps/web byok/preflight) catches a missing
   // provider before any POST: it blocks the submit and opens the execution
@@ -597,9 +827,9 @@ test('[P1] BYOK OpenCode run is blocked before spawn when provider config is mis
   await page.getByTestId('chat-send').click();
 
   // The preflight opens the execution-mode Settings section.
-  await expect(
-    page.getByRole('dialog').filter({ hasText: 'Execution mode' }),
-  ).toBeVisible({ timeout: 15_000 });
+  const settings = page.locator('.modal-settings');
+  await expect(settings).toBeVisible({ timeout: 15_000 });
+  await expect(settings.getByRole('tablist', { name: 'Execution mode' })).toBeVisible();
 
   // No run was created and no artifact was produced — the block is pre-spawn.
   await runRequests.expectNone({
@@ -609,23 +839,14 @@ test('[P1] BYOK OpenCode run is blocked before spawn when provider config is mis
   runRequests.dispose?.();
   expect(await listProjectFiles(page, projectId)).toEqual([]);
 
+  await page.goto(projectUrl, { waitUntil: 'domcontentloaded' });
+  await expectWorkspaceReady(page);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expectWorkspaceReady(page);
   expect(await listProjectFiles(page, projectId)).toEqual([]);
 });
 
-// BLOCKED — no UI entry point left for agent-driven plugin authoring.
-//
-// This spec used to start from the Home rail's More-shortcuts menu ("Create a
-// plugin", `home-hero-rail-create-plugin`), which #5517 deleted along with the
-// rest of the rail. The daemon-side capability is intact and
-// `EntryShell.startPluginAuthoring` / `createPluginAuthoringHandoff` are still
-// wired, but nothing calls them any more: `EntryShell` hands
-// `onCreatePlugin={startPluginAuthoring}` to `ExtensionsMarketplace`, which
-// only uses the prop as a boolean gate for a Create button that opens the
-// import/upload dialog instead. Restore an entry point (or re-point this spec
-// at it) before un-fixme-ing — do not weaken the assertions to make it pass.
-test.fixme('[P1] plugin authoring produces a generated-plugin scaffold with action cards', async ({ page }) => {
+test('[P1] plugin authoring produces a generated-plugin scaffold with action cards', async ({ page }) => {
   await configureFakeAgent(page, 'codex');
   await installBrowserAgentConfig(page, 'codex');
   await gotoEntryHome(page);
@@ -637,16 +858,14 @@ test.fixme('[P1] plugin authoring produces a generated-plugin scaffold with acti
   await expectBrowserAgentConfig(page, 'codex');
   await dismissPrivacyDialog(page);
 
-  // Enter plugin authoring through the Plugins page create button. It drives
-  // the same queuePluginAuthoring flow as the home shortcuts menu, and this
-  // spec's oracle is the generated scaffold plus its action cards — not the
-  // menu chrome. The shortcuts trigger itself sits disabled on CI runners
-  // while a home plugin apply hangs; that anomaly is tracked as its own
-  // follow-up rather than blocking this journey.
+  // Enter plugin authoring through the current Plugins Add panel. The
+  // agent-assisted option hands its prompt back to the Home composer; the
+  // scaffold and action cards below remain the end-to-end oracle.
   await page.goto('/plugins', { waitUntil: 'domcontentloaded' });
   await waitForLoadingToClear(page);
-  await page.getByTestId('plugins-create-button').click();
-  await expect(page.getByTestId('home-hero-input')).toHaveText(/Create an Open Design plugin for:/);
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.getByTestId('plugin-create-with-agent').click();
+  await expect(page.getByTestId('home-hero-input')).toHaveText(/Create an OpenDesign plugin for:/);
 
   const projectRequestPromise = page.waitForRequest(isCreateProjectRequest);
   const runRequestPromise = page.waitForRequest(isCreateRunRequest);
@@ -666,7 +885,7 @@ test.fixme('[P1] plugin authoring produces a generated-plugin scaffold with acti
   expect(runBody.message).toContain('produce a folder named generated-plugin');
 
   await expectWorkspaceReady(page);
-  const { projectId } = await currentProjectContext(page);
+  const { projectId, conversationId } = await currentProjectContext(page);
   await expectProjectFilesToContain(page, projectId, [
     'generated-plugin/open-design.json',
     'generated-plugin/SKILL.md',
@@ -674,6 +893,15 @@ test.fixme('[P1] plugin authoring produces a generated-plugin scaffold with acti
   ]);
   await expectProjectFileToContain(page, projectId, 'generated-plugin/open-design.json', '"name": "generated-plugin"');
   await expectProjectFileToContain(page, projectId, 'generated-plugin/SKILL.md', '# Generated Plugin');
+
+  await expectRestoredDelayedAssistantMessage(page, projectId, conversationId, {
+    producedFiles: [
+      'generated-plugin/examples/demo.md',
+      'generated-plugin/SKILL.md',
+      'generated-plugin/open-design.json',
+    ],
+    expectedThinking: false,
+  });
 
   await expect(page.getByText('Files from this turn')).toBeVisible();
   await expect(page.getByTestId('assistant-plugin-actions-generated-plugin')).toBeVisible();
@@ -712,7 +940,12 @@ test('[P0] real daemon run supports fake non-Codex runtime protocols', async ({ 
   }
 });
 
-async function createProject(page: Page, name: string, agentId: FakeAgentId = 'codex') {
+async function createProject(
+  page: Page,
+  name: string,
+  agentId: FakeAgentId = 'codex',
+  conversationMode?: 'design' | 'chat' | 'plan',
+) {
   const projectId = `real-daemon-${name}-${Date.now()}`.replace(/[^A-Za-z0-9._-]/g, '-');
   await configureFakeAgent(page, agentId);
   await installBrowserAgentConfig(page, agentId);
@@ -722,7 +955,12 @@ async function createProject(page: Page, name: string, agentId: FakeAgentId = 'c
   // redundant setup it removed — `installBrowserAgentConfig` above already
   // seeded it — and the goto is guarded against the aborted-navigation races a
   // domcontentloaded wait can lose to.
-  const { conversationId } = await createProjectViaApi(page, projectId, name);
+  const { conversationId } = await createProjectViaApi(
+    page,
+    projectId,
+    name,
+    conversationMode,
+  );
   try {
     await page.goto(`/projects/${projectId}/conversations/${conversationId}`, {
       waitUntil: 'domcontentloaded',
@@ -734,6 +972,38 @@ async function createProject(page: Page, name: string, agentId: FakeAgentId = 'c
   await waitForLoadingToClear(page);
   await expectBrowserAgentConfig(page, agentId);
   await dismissPrivacyDialog(page);
+}
+
+async function prepareLocalOdNextCanary(page: Page, name: string): Promise<void> {
+  // Exercise the shipped Design-mode New Project flow, rather than hand-
+  // constructing the create payload. EntryShell leaves the silently selected
+  // default out of explicit plugin authority; the daemon derives and stamps
+  // its exact snapshot, so rollout can replace only that automatic pin.
+  await configureFakeAgent(page, 'opencode');
+  await installBrowserAgentConfig(page, 'opencode');
+  await gotoEntryHome(page);
+  await setBrowserAgentConfig(page, 'opencode');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await waitForLoadingToClear(page);
+  await setBrowserAgentConfig(page, 'opencode');
+  await configureFakeAgent(page, 'opencode');
+  await expectBrowserAgentConfig(page, 'opencode');
+  await dismissPrivacyDialog(page);
+  await openNewProjectModalFromProjects(page);
+  await page.getByTestId('new-project-tab-prototype').click();
+  await page.getByTestId('new-project-name').fill(name);
+  await page.getByTestId('create-project').click();
+  await expectWorkspaceReady(page);
+  await configureFakeAgent(page, 'opencode');
+  const response = await page.request.get('/api/agents');
+  expect(response.ok(), await response.text()).toBeTruthy();
+  const body = await response.json() as {
+    agents?: Array<{ id: string; available: boolean; version?: string }>;
+  };
+  expect(body.agents?.find((agent) => agent.id === 'opencode')).toMatchObject({
+    available: true,
+    version: 'opencode-e2e 0.0.0',
+  });
 }
 
 async function createByokOpenCodeProject(page: Page, name: string) {
@@ -753,8 +1023,15 @@ async function createByokOpenCodeProject(page: Page, name: string) {
   await page.getByTestId('create-project').click();
 }
 
-async function createProjectViaApi(page: Page, projectId: string, name: string) {
+async function createProjectViaApi(
+  page: Page,
+  projectId: string,
+  name: string,
+  conversationMode?: 'design' | 'chat' | 'plan',
+  headers?: Readonly<Record<string, string>>,
+) {
   const response = await page.request.post('/api/projects', {
+    ...(headers ? { headers: { ...headers } } : {}),
     data: {
       id: projectId,
       name,
@@ -762,6 +1039,7 @@ async function createProjectViaApi(page: Page, projectId: string, name: string) 
       designSystemId: null,
       pendingPrompt: null,
       metadata: { kind: 'prototype' },
+      ...(conversationMode ? { conversationMode } : {}),
     },
   });
   expect(response.ok()).toBeTruthy();
@@ -793,6 +1071,15 @@ async function openProjectFromProjectsView(page: Page, projectId: string) {
  * journey below depends on.
  */
 async function leaveProjectForEntry(page: Page) {
+  // In docked project mode the state-bearing pinned tab remains mounted in
+  // the hidden dock strip while `workspace-home-chrome` is its visible,
+  // interactive stand-in in the top chrome.
+  const dockedHome = page.getByTestId('workspace-home-chrome');
+  if (await dockedHome.isVisible().catch(() => false)) {
+    await dockedHome.click();
+    await expect(page.getByTestId('file-workspace')).toHaveCount(0);
+    return;
+  }
   const pinnedEntryTab = page.locator('.workspace-tab.is-pinned');
   await expect(pinnedEntryTab).toBeVisible();
   await pinnedEntryTab.locator('.workspace-tab__main').click();
@@ -814,7 +1101,7 @@ async function gotoEntryHome(page: Page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await waitForLoadingToClear(page);
   await projectsSettled;
-  const privacyDialog = page.getByRole('dialog').filter({ hasText: 'Help us improve Open Design' });
+  const privacyDialog = page.getByRole('dialog').filter({ hasText: 'Help us improve OpenDesign' });
   if (await privacyDialog.isVisible()) {
     await privacyDialog.getByRole('button', { name: /I get it|not now|got it|don't share/i }).click();
     await expect(privacyDialog).toHaveCount(0);
@@ -926,7 +1213,7 @@ async function openNewProjectModal(page: Page) {
 }
 
 async function dismissPrivacyDialog(page: Page) {
-  const privacyDialog = page.getByRole('dialog').filter({ hasText: 'Help us improve Open Design' });
+  const privacyDialog = page.getByRole('dialog').filter({ hasText: 'Help us improve OpenDesign' });
   if (await privacyDialog.isVisible()) {
     await privacyDialog.getByRole('button', { name: /I get it|not now|got it|don't share/i }).click();
     await expect(privacyDialog).toHaveCount(0);
@@ -934,7 +1221,7 @@ async function dismissPrivacyDialog(page: Page) {
 }
 
 async function waitForLoadingToClear(page: Page) {
-  await page.getByText('Loading Open Design…').waitFor({ state: 'hidden', timeout: T.long });
+  await page.getByText('Loading OpenDesign…').waitFor({ state: 'hidden', timeout: T.long });
 }
 
 async function clickVisible(locator: Locator) {

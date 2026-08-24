@@ -99,6 +99,45 @@ const workspaceScopeMocks = vi.hoisted(() => {
     } as ProjectWorkspaceScopeState,
   };
 });
+
+function stubAuthoritativePersonalWorkspaceBalance(balanceUsd: string): void {
+  const observedAt = '2026-07-26T00:00:00.000Z';
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const url = new URL(String(input), 'http://localhost');
+    if (url.pathname !== '/api/workspace/billing') {
+      throw new Error(`Unexpected fetch: ${String(input)}`);
+    }
+    return new Response(JSON.stringify({
+      summary: null,
+      workspaceBalance: {
+        workspaceId: 'workspace-personal',
+        workspaceMemberId: 'member-personal',
+        balanceUsd,
+        billingScopeVersion: 2,
+        expiresAt: null,
+        updatedAt: observedAt,
+      },
+      workspaceRuntime: {
+        workspaceId: 'workspace-personal',
+        workspaceMemberId: 'member-personal',
+        status: 'fresh',
+        revision: '1',
+        observedAt,
+        softExpiresAt: '2099-07-26T00:00:30.000Z',
+        hardExpiresAt: '2099-07-26T00:02:00.000Z',
+        retryAt: null,
+        errorCode: null,
+        reason: 'authoritative-action-read',
+        sourceGapDetected: false,
+      },
+      authoritativeWorkspaceRead: {
+        workspaceId: 'workspace-personal',
+        workspaceMemberId: 'member-personal',
+        observedAt,
+      },
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }));
+}
 const projectCollabMocks = vi.hoisted(() => ({
   enabled: false,
   syncState: 'local_only' as 'local_only' | 'synced' | null,
@@ -579,6 +618,21 @@ vi.mock('../../src/components/ChatPane', () => ({
         >
           send with context
         </button>
+        <button
+          type="button"
+          data-testid="send-message-stable-request"
+          onClick={() =>
+            onSend(
+              'hello from stable request',
+              [],
+              [],
+              { clientRequestId: 'submission-1' },
+            )
+          }
+          disabled={sendDisabled}
+        >
+          send stable request
+        </button>
         <button type="button" data-testid="new-conversation" onClick={onNewConversation}>
           new
         </button>
@@ -845,6 +899,7 @@ describe('ProjectView conversation run isolation', () => {
       stale: false,
       source: 'vela_api',
     });
+    stubAuthoritativePersonalWorkspaceBalance('10.00');
     launchAntigravityOauth.mockResolvedValue({ ok: true });
     streamViaDaemon.mockImplementation(async () => {});
   });
@@ -1021,7 +1076,7 @@ describe('ProjectView conversation run isolation', () => {
     },
   );
 
-  // An Open Design Cloud run is billed to the CALLER's own wallet. The gate must
+  // An OpenDesign Cloud run is billed to the CALLER's own wallet. The gate must
   // therefore ask about the caller's identity, not about this project's
   // workspace scope — a project whose scope is unresolved says nothing about
   // whether the signed-in user can pay, and holding the send closed there just
@@ -1373,6 +1428,7 @@ describe('ProjectView conversation run isolation', () => {
       stale: false,
       source: 'vela_api',
     });
+    stubAuthoritativePersonalWorkspaceBalance('0');
     renderProjectView(
       { ...config, agentId: 'amr' },
       project,
@@ -1408,6 +1464,7 @@ describe('ProjectView conversation run isolation', () => {
       stale: false,
       source: 'vela_api',
     });
+    stubAuthoritativePersonalWorkspaceBalance('1.20');
     renderProjectView(
       { ...config, agentId: 'amr' },
       project,
@@ -1451,6 +1508,7 @@ describe('ProjectView conversation run isolation', () => {
       stale: false,
       source: 'vela_api',
     });
+    stubAuthoritativePersonalWorkspaceBalance('1.20');
     renderProjectView(
       { ...config, agentId: 'amr' },
       project,
@@ -1822,6 +1880,62 @@ describe('ProjectView conversation run isolation', () => {
     expect(reattachDaemonRun).not.toHaveBeenCalled();
   });
 
+  it('trusts the daemon artifact count when browser file reconciliation misses delivered output', async () => {
+    conversationAMessages = [
+      {
+        ...succeededAssistant,
+        content: '',
+        sessionMode: 'design',
+        events: [
+          { kind: 'text', text: 'I finished the design.' },
+          {
+            kind: 'tool_use',
+            id: 'write-1',
+            name: 'Write',
+            input: { file_path: 'index.html', content: '<!doctype html>' },
+          },
+        ],
+        preTurnFileNames: [],
+        producedFiles: undefined,
+        traceObjectFiles: undefined,
+      },
+    ];
+    fetchChatRunStatus.mockResolvedValue({
+      id: 'run-a',
+      status: 'succeeded',
+      createdAt: 1,
+      updatedAt: 2,
+      exitCode: 0,
+      signal: null,
+      artifactCount: 1,
+    });
+
+    renderProjectView();
+
+    await waitFor(() => {
+      const recoveredMessage = saveMessage.mock.calls
+        .map((call) => call[2] as ChatMessage)
+        .find(
+          (message) =>
+            message.id === succeededAssistant.id
+            && message.resultDeliveryState === 'delivered',
+        );
+      expect(recoveredMessage).toMatchObject({
+        runStatus: 'succeeded',
+        resultDeliveryState: 'delivered',
+        producedFiles: [],
+        traceObjectFiles: [],
+      });
+      expect(recoveredMessage?.events).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'ARTIFACT_NOT_FOUND' }),
+        ]),
+      );
+    });
+    expect(screen.getByTestId('chat-error').textContent).toBe('');
+    expect(reattachDaemonRun).not.toHaveBeenCalled();
+  });
+
   it('keeps a reloaded report-only Design run without file writes on the success path', async () => {
     // Prose-only turns (image analysis, audits) are legitimate zero-file
     // Design results (#5714, #5718); reload must not downgrade them.
@@ -2027,6 +2141,48 @@ describe('ProjectView conversation run isolation', () => {
 
     expect(streamViaDaemon).not.toHaveBeenCalled();
     expect(screen.getByTestId('attached-comment-count').textContent).toBe('0');
+  });
+
+  it('queues a logical submission only once when its stable request id is retried', async () => {
+    renderProjectView();
+
+    await waitFor(() => expect(screen.getByTestId('active-conversation').textContent).toBe('conv-a'));
+    await waitFor(() => expect(screen.getByTestId('streaming-state').textContent).toBe('streaming'));
+
+    fireEvent.click(screen.getByTestId('send-message-stable-request'));
+    fireEvent.click(screen.getByTestId('send-message-stable-request'));
+
+    await waitFor(() => expect(screen.getByTestId('send-queued-0')).toBeTruthy());
+    expect(screen.queryByTestId('send-queued-1')).toBeNull();
+  });
+
+  it('reuses a queued submission request id when the daemon run starts', async () => {
+    let finishReattach: (() => void) | null = null;
+    let reattachHandlers: { onDone: () => void } | null = null;
+    reattachDaemonRun.mockImplementation(async (input: unknown) => {
+      reattachHandlers = (input as { handlers: { onDone: () => void } }).handlers;
+      return new Promise<void>((resolve) => {
+        finishReattach = resolve;
+      });
+    });
+
+    renderProjectView();
+
+    await waitFor(() => expect(screen.getByTestId('active-conversation').textContent).toBe('conv-a'));
+    await waitFor(() => expect(screen.getByTestId('streaming-state').textContent).toBe('streaming'));
+
+    fireEvent.click(screen.getByTestId('send-message-stable-request'));
+    await waitFor(() => expect(screen.getByTestId('send-queued-0')).toBeTruthy());
+
+    await act(async () => {
+      reattachHandlers?.onDone();
+      finishReattach?.();
+    });
+
+    await waitFor(() => expect(streamViaDaemon).toHaveBeenCalledTimes(1));
+    expect(streamViaDaemon).toHaveBeenCalledWith(expect.objectContaining({
+      clientRequestId: 'submission-1',
+    }));
   });
 
   it('keeps newer attached comments when a queued send flushes older comment attachments', async () => {
@@ -2540,6 +2696,28 @@ describe('ProjectView conversation run isolation', () => {
 
     await waitFor(() => expect(screen.getByTestId('active-conversation').textContent).toBe('conv-a'));
     await waitFor(() => expect(screen.getByTestId('send-queued-0').textContent).toBe('hello from b'));
+  });
+
+  it('restores only one queued send for each stable request id', async () => {
+    reattachDaemonRun.mockImplementation(async () => new Promise<void>(() => {}));
+    const duplicateQueuedSend = {
+      id: 'submission-1',
+      conversationId: 'conv-a',
+      prompt: 'hello from stable request',
+      attachments: [],
+      commentAttachments: [],
+      meta: { clientRequestId: 'submission-1' },
+      createdAt: 1,
+    };
+    window.localStorage.setItem(
+      'od:chat-queued-sends:project-1:v1',
+      JSON.stringify([duplicateQueuedSend, duplicateQueuedSend]),
+    );
+
+    renderProjectView();
+
+    await waitFor(() => expect(screen.getByTestId('send-queued-0')).toBeTruthy());
+    expect(screen.queryByTestId('send-queued-1')).toBeNull();
   });
 
   it('surfaces conversation message load errors and keeps sends disabled until messages load', async () => {

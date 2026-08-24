@@ -88,6 +88,7 @@ export interface Dict {
   'workspaceInvite.confirm': string;
   'workspaceInvite.submitFailed': string;
   'workspaceInvite.errorAlreadyMember': string;
+  'workspaceInvite.errorPendingInvite': string;
   'workspaceInvite.errorNoSession': string;
   'workspaceInvite.errorNoWorkspace': string;
   'workspaceInvite.errorUnreachable': string;
@@ -546,6 +547,12 @@ export interface Dict {
   'settings.getStarted': string;
   'settings.envConfigure': string;
   'settings.localCli': string;
+  'settings.dshSetupTitle': string;
+  'settings.dshSetupDescription': string;
+  'settings.dshSetupNote': string;
+  'settings.dshSetupConfirm': string;
+  'settings.dshSetupInstalling': string;
+  'settings.dshSetupRequired': string;
   'settings.anthropicApi': string;
   'settings.noAgentSelected': string;
   'settings.language': string;
@@ -1250,6 +1257,10 @@ export interface Dict {
   'entry.navTeamSection': string;
   'entry.teamSlotNote': string;
   'entry.cloudCalloutTitle': string;
+  'entry.cloudRecovering': string;
+  'entry.authExpiredBody': string;
+  'home.createFailed': string;
+  'home.daemonRecovering': string;
   'entry.cloudCalloutBody': string;
   'entry.cloudCalloutDismissAria': string;
   'entry.workspaceLockedNote': string;
@@ -2805,9 +2816,14 @@ export interface Dict {
   'inlineSwitcher.missingApiKey': string;
   'inlineSwitcher.openFullSettings': string;
   'inlineSwitcher.customSuffix': string;
+  'inlineSwitcher.unlimitedBadge': string;
 
   // Project view / chat pane / composer
   'project.backToProjects': string;
+  'project.restoreAutomaticScenario': string;
+  'project.restoreAutomaticScenarioConfirm': string;
+  'project.restoreAutomaticScenarioBusy': string;
+  'project.restoreAutomaticScenarioFailed': string;
   'project.brandReadyTitle': string;
   'project.brandReadyTitleGeneric': string;
   'project.brandReadyCta': string;
@@ -2881,6 +2897,7 @@ export interface Dict {
   'chat.runError.title.connectionDropped': string;
   'chat.runError.title.signInRequired': string;
   'chat.runError.title.rateLimited': string;
+  'chat.runError.title.modelWindowLimit': string;
   'chat.runError.title.cliMissing': string;
   'chat.runError.title.promptTooLarge': string;
   'chat.runError.title.modelUnavailable': string;
@@ -2894,6 +2911,7 @@ export interface Dict {
   'chat.runError.title.sessionExpired': string;
   'chat.runError.title.gitBashMissing': string;
   'chat.runError.title.cpuUnsupported': string;
+  'chat.runError.title.strategyTaskHalted': string;
   'chat.runError.title.generic': string;
   'chat.runError.title.artifactMissing': string;
   'chat.runError.signInMessage.amr': string;
@@ -2902,6 +2920,8 @@ export interface Dict {
   'chat.runError.promptTooLargeMessage': string;
   'chat.runError.modelUnavailableMessage': string;
   'chat.runError.rateLimitedMessage': string;
+  'chat.runError.modelWindowLimitMessage': string;
+  'chat.runError.modelWindowLimitMessageNoTime': string;
   'chat.runError.upstreamUnavailableMessage': string;
   'chat.runError.toolLoopMessage': string;
   'chat.runError.outputInvalidMessage': string;
@@ -2914,6 +2934,7 @@ export interface Dict {
   'chat.runError.sessionExpiredMessage': string;
   'chat.runError.gitBashMissingMessage': string;
   'chat.runError.cpuUnsupportedMessage': string;
+  'chat.runError.strategyTaskStateMismatchMessage': string;
   'chat.runError.agentFallback': string;
   'chat.runError.sourceLabel': string;
   'chat.runError.sourceExpandAria': string;
@@ -2934,6 +2955,7 @@ export interface Dict {
   'chat.comments.removeAttachmentAria': string;
   'chat.comments.comment': string;
   'chat.comments.sendToChat': string;
+  'chat.comments.viewAll': string;
   'chat.comments.sending': string;
   'chat.comments.edit': string;
   'chat.comments.select': string;
@@ -4036,6 +4058,7 @@ export interface Dict {
   'fileViewer.shareMenuPresentation': string;
   'fileViewer.shareMenuSourceFiles': string;
   'fileViewer.shareMenuSave': string;
+  'fileViewer.shareMenuPublishViaOd': string;
   'fileViewer.unifiedShareAria': string;
   'fileViewer.unifiedShareTab': string;
   'fileViewer.unifiedExportTab': string;
@@ -4096,6 +4119,7 @@ export interface Dict {
   'fileViewer.exportPptxBusy': string;
   'fileViewer.exportPptxHint': string;
   'fileViewer.exportPptxNa': string;
+  'fileViewer.exportDaemonUnreachable': string;
   'fileViewer.exportZip': string;
   'fileViewer.exportHtml': string;
   'fileViewer.exportMd': string;
@@ -4323,6 +4347,7 @@ export interface Dict {
   'assistant.role': string;
   'assistant.workingLabel': string;
   'assistant.doneLabel': string;
+  'assistant.canceledLabel': string;
   'assistant.copyMarkdown': string;
   'assistant.forkConversation': string;
   'assistant.forkingConversation': string;
@@ -4436,6 +4461,7 @@ export interface Dict {
   'questions.tabLabel': string;
   'questions.banner': string;
   'questions.bannerAnswered': string;
+  'questions.strategyBlockedNotice': string;
   'questions.continue': string;
   'questions.generating': string;
   'questions.skipAll': string;
@@ -4578,6 +4604,7 @@ export interface Dict {
   'pet.slashPopoverTitle': string;
   'pet.slashPopoverHint': string;
   'pet.slashPet': string;
+  'pet.slashMcp': string;
   'pet.slashPetWake': string;
   'pet.slashPetTuck': string;
   'pet.slashHatch': string;
@@ -5414,4 +5441,25 @@ export interface Dict {
   'campaign.deepseekV4Flash.restricted.tooltip': string;
   'campaign.deepseekV4Flash.workbenchBadge': string;
   'campaign.deepseekV4Flash.workbenchBadgeAria': string;
+
+  'experienceSurvey.tag': string;
+  'experienceSurvey.close': string;
+  'experienceSurvey.recommendation': string;
+  'experienceSurvey.recommendationLow': string;
+  'experienceSurvey.recommendationHigh': string;
+  'experienceSurvey.improvement': string;
+  'experienceSurvey.improvement.wrongOutput': string;
+  'experienceSurvey.improvement.falseDone': string;
+  'experienceSurvey.improvement.hardToUse': string;
+  'experienceSurvey.improvement.upgradePrompts': string;
+  'experienceSurvey.improvement.stuck': string;
+  'experienceSurvey.improvement.slow': string;
+  'experienceSurvey.improvement.looks': string;
+  'experienceSurvey.improvement.regression': string;
+  'experienceSurvey.improvement.other': string;
+  'experienceSurvey.otherPlaceholder': string;
+  'experienceSurvey.submit': string;
+  'experienceSurvey.skip': string;
+  'experienceSurvey.thanksTitle': string;
+  'experienceSurvey.thanksBody': string;
 }

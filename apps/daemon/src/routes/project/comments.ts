@@ -11,7 +11,7 @@ export type ProjectCommentWorkspaceContextResolution =
   | { ok: true; context: WorkspaceCollabContext | null }
   | {
       ok: false;
-      status: 400 | 403 | 503;
+      status: 400 | 401 | 403 | 503;
       code: string;
       message: string;
       retryable?: true;
@@ -61,6 +61,15 @@ export interface RegisterProjectCommentRoutesDeps extends RouteDeps<'db' | 'proj
    * and fail-closed on every write.
    */
   resolveReadWorkspaceContext?: (
+    req: Request,
+    projectId: string,
+  ) => Promise<ProjectCommentWorkspaceContextResolution>;
+  /**
+   * Fresh cloud authority used only before pulling remote comment state. Local
+   * list/create/edit/delete paths use the persisted project binding and must
+   * remain available while the membership directory is offline.
+   */
+  resolveFreshWorkspaceContext?: (
     req: Request,
     projectId: string,
   ) => Promise<ProjectCommentWorkspaceContextResolution>;
@@ -378,7 +387,9 @@ export function registerProjectCommentRoutes(app: Express, ctx: RegisterProjectC
     await ctx.onCommentsRead?.(
       req.params.id,
       workspaceResolution.context,
-      () => resolveRequestWorkspaceContext(req, req.params.id),
+      () => ctx.resolveFreshWorkspaceContext
+        ? ctx.resolveFreshWorkspaceContext(req, req.params.id)
+        : resolveRequestWorkspaceContext(req, req.params.id),
     );
     res.json({
       comments: commentsAreProjectScoped(

@@ -12,10 +12,11 @@ import type {
 } from '../public-params.js';
 import type { ReleaseChannel } from '@open-design/release';
 import type { ArtifactOriginEntrySurface, ArtifactOriginStatus } from '../../api/files.js';
+import type { AgentDiagnosticReason, AgentDiagnosticSeverity } from '../../api/registry.js';
 import type { TrackingDesignSystemEditSurface, TrackingDesignSystemKind, TrackingDesignSystemLengthBucket, TrackingDesignSystemOrigin, TrackingDesignSystemRunEntryFrom } from './design-systems.js';
 import type { TrackingSettingsPage } from './event-names.js';
-import type { TrackingAmrOpenCodeErrorPhase, TrackingAmrOpenCodeLastEventType, TrackingAmrOpenCodeLastToolKind, TrackingAmrOpenCodeLastToolStatus, TrackingArtifactKind, TrackingArtifactWriteSource, TrackingArtifactWriteStatus, TrackingByokPreflightBlockReason, TrackingByokProviderId, TrackingCliProviderId, TrackingDesignSystemSource, TrackingExecutionMode, TrackingExportFormat, TrackingExportResult, TrackingFeedbackAction, TrackingFeedbackProviderId, TrackingFeedbackRating, TrackingFeedbackRatingWithNone, TrackingFeedbackReasonCode, TrackingFidelity, TrackingFileSizeBucket, TrackingFileType, TrackingFirstModelEventType, TrackingLangfuseDeliveryStatus, TrackingLangfuseDropReason, TrackingLangfuseReportResult, TrackingLangfuseReportSkipReason, TrackingProjectKind, TrackingProjectSource, TrackingResult, TrackingRunCloseReason, TrackingRunDiagnosticSource, TrackingRunFailureCategory, TrackingRunFailureDetail, TrackingRunFailureStage, TrackingRunFailureUserAction, TrackingRunLifecyclePhase, TrackingRunPhaseTimingStatus, TrackingRunResult, TrackingRunRetryFinalResult, TrackingRunRetryStrategy, TrackingRunRetrySuppressedReason, TrackingStderrLineCountBucket, TrackingTestResult, TrackingTokenCountSource } from './shared-enums.js';
-import type { TrackingFileVersionSource, TrackingPluginImportSource, TrackingSessionMode, TrackingSettingsArea } from './ui-click.js';
+import type { TrackingAmrOpenCodeErrorPhase, TrackingAmrOpenCodeLastEventType, TrackingAmrOpenCodeLastToolKind, TrackingAmrOpenCodeLastToolStatus, TrackingArtifactKind, TrackingArtifactWriteSource, TrackingArtifactWriteStatus, TrackingByokPreflightBlockReason, TrackingByokProviderId, TrackingCliProviderId, TrackingDesignSystemSource, TrackingExecutionMode, TrackingExportFormat, TrackingExportResult, TrackingFeedbackAction, TrackingFeedbackProviderId, TrackingFeedbackRating, TrackingFeedbackRatingWithNone, TrackingFeedbackReasonCode, TrackingFidelity, TrackingFileSizeBucket, TrackingFileType, TrackingFirstModelEventType, TrackingLangfuseDeliveryStatus, TrackingLangfuseDropReason, TrackingLangfuseReportResult, TrackingLangfuseReportSkipReason, TrackingProjectKind, TrackingProjectSource, TrackingPublishErrorCode, TrackingResult, TrackingRunCancelOrigin, TrackingRunCloseReason, TrackingRunDiagnosticSource, TrackingRunFailureCategory, TrackingRunFailureDetail, TrackingRunFailureStage, TrackingRunFailureUserAction, TrackingRunLifecyclePhase, TrackingRunPhaseTimingStatus, TrackingRunResult, TrackingRunRetryFinalResult, TrackingRunRetryStrategy, TrackingRunRetrySuppressedReason, TrackingRunTerminalTrigger, TrackingStderrLineCountBucket, TrackingTestResult, TrackingTokenCountSource } from './shared-enums.js';
+import type { ConversationForkAnalyticsContext, TrackingFileVersionSource, TrackingPluginImportSource, TrackingSessionMode, TrackingSettingsArea } from './ui-click.js';
 // ---- Result events -------------------------------------------------------
 
 // Final outcome for the paid provider submission. Keep this envelope free of
@@ -97,8 +98,10 @@ export interface SpeakerNotesSaveResultProps {
 
 // Outcome of an actual import attempt from the plugin import modal. Fires
 // once per executed import (after the install/upload promise settles), not
-// for clicks that no-op. `error_code` carries the backend failure message —
-// the install pipeline has no structured codes (see PluginInstallOutcome).
+// for clicks that no-op. `error_code` carries a bounded machine-readable
+// backend code when available, with a stable HTTP/network fallback. Never put
+// the free-form install message here: it can contain URLs, paths, or upstream
+// response text and would create unbounded analytics cardinality.
 export interface PluginImportResultProps {
   page_name: 'plugins';
   area: 'import_modal';
@@ -218,6 +221,11 @@ export interface RunTimingProps {
   time_to_first_visible_output_ms?: number;
   time_to_first_artifact_ms?: number;
   generation_duration_ms?: number;
+  // Model-active window: first model event of any kind (tool call, thinking,
+  // text, artifact) to run end. Prefer this over `generation_duration_ms` when
+  // comparing agents -- the latter starts at the first text token, so a
+  // tool-first run reports only its closing message.
+  model_active_duration_ms?: number;
   finalize_duration_ms?: number;
   collection_status?: TrackingRunPhaseTimingStatus;
 }
@@ -380,7 +388,7 @@ export interface RunCreatedProps extends RunTaskLineageProps {
   tokens: RunTokenProps;
   design_system?: RunDesignSystemProps;
   // External MCP/Plugin attribution. These fields are optional so existing UI
-  // and CLI Run producers keep their current contract; the Open Design Cloud
+  // and CLI Run producers keep their current contract; the OpenDesign Cloud
   // Plugin path validates and supplies the complete subset.
   entry_surface?: AnalyticsEntrySurface;
   host_product?: AnalyticsHostProduct;
@@ -405,6 +413,10 @@ export interface RunFinishedProps extends Omit<RunCreatedProps, 'area'> {
   area: 'chat_panel' | 'design_system_generation';
   result: TrackingRunResult;
   error_code?: string;
+  /** Only `user_stop` proves the user explicitly cancelled the run. */
+  cancel_origin?: TrackingRunCancelOrigin;
+  /** Lifecycle or watchdog mechanism that forced the terminal state. */
+  terminal_trigger?: TrackingRunTerminalTrigger;
   failure_category?: TrackingRunFailureCategory;
   failure_detail?: TrackingRunFailureDetail;
   /** v4 name; failure_detail remains during the compatibility window. */
@@ -450,6 +462,15 @@ export interface RunFinishedProps extends Omit<RunCreatedProps, 'area'> {
   // the daemon captured a baseline snapshot for the run.
   artifacts_created?: number;
   artifacts_modified?: number;
+  // Distinct files of ANY type this run created or modified — markdown briefs,
+  // docx exports, JSON data, code, plus everything `artifact_count` covers.
+  // `artifact_count` deliberately counts only renderable outputs (HTML +
+  // image/video/audio), which made a run whose deliverable was `PROMPTS.md`
+  // or `report.docx` indistinguishable from a pure chat turn (sampled 2026-08:
+  // ~1/3 of "artifact_count = 0" successes had written such files). Primary
+  // source is the filesystem snapshot diff; when no baseline exists the
+  // tool-stream fallback reports it with the usual per-agent blind spots.
+  files_written_count?: number;
   // True when the run raised a `<question-form>` clarification. Such runs
   // are intent-clarification turns (the agent stops to ask the user a question)
   // and therefore inherently produce no artifact, so the dashboard can exclude
@@ -494,6 +515,10 @@ export interface RunFinishedProps extends Omit<RunCreatedProps, 'area'> {
   time_to_first_token_ms?: number;
   time_to_first_visible_output_ms?: number;
   runtime_init_to_first_token_ms?: number;
+  // Runtime init measured to the first model event of any kind rather than to
+  // the first text token. On a tool-first run the first-token variant absorbs
+  // the whole tool loop and reads as slow startup.
+  runtime_init_to_first_model_response_ms?: number;
   spawn_to_first_token_ms?: number;
   time_to_first_artifact_ms?: number;
   // `spawn_to_first_token_ms` split into auditable subsegments so dashboards
@@ -505,6 +530,8 @@ export interface RunFinishedProps extends Omit<RunCreatedProps, 'area'> {
   model_first_token_ms?: number;
   spawn_to_first_token_remainder_ms?: number;
   generation_duration_ms?: number;
+  // See `RunTimingProps.model_active_duration_ms`.
+  model_active_duration_ms?: number;
   tool_call_count?: number;
   tool_duration_ms?: number;
   artifact_write_duration_ms?: number;
@@ -518,6 +545,10 @@ export interface RunFinishedProps extends Omit<RunCreatedProps, 'area'> {
   diagnostics?: RunDiagnosticsProps;
   langfuse_delivery?: RunLangfuseDeliveryProps;
   bottleneck_phase?: TrackingRunLifecyclePhase;
+  // Which phase-boundary definition produced `bottleneck_phase`. Absent on
+  // rows written before the definition was versioned. Rows from different
+  // versions are not comparable -- filter to one, do not average across.
+  phase_schema_version?: number;
   last_observed_phase?: TrackingRunLifecyclePhase;
   phase_timing_status?: TrackingRunPhaseTimingStatus;
   // E-lite root-cause discriminators. `last_observed_phase` tells us WHICH phase
@@ -565,6 +596,29 @@ export interface RunFinishedProps extends Omit<RunCreatedProps, 'area'> {
   agent_cli_version?: string;
   runtime_companion_name?: string;
   runtime_companion_version?: string;
+  /** Current assistant-message event persistence path for rollout comparison. */
+  message_event_storage_mode?: 'events_json_snapshot' | 'append_only';
+  /** Persistable agent events observed before batching or compaction. */
+  message_event_input_count?: number;
+  message_event_delta_count?: number;
+  /** Approximate UTF-16 character volume accepted by the persistence path. */
+  message_event_input_char_count?: number;
+  /** Synchronous message persistence batches attempted during this run. */
+  message_event_flush_count?: number;
+  /** Events handed to storage after in-memory adjacent-delta compaction. */
+  message_event_batch_event_count?: number;
+  /** Final compacted event count observed after the last successful flush. */
+  message_event_persisted_count?: number;
+  message_event_flush_total_ms?: number;
+  message_event_flush_max_ms?: number;
+  message_event_pending_char_peak?: number;
+  /** Number and cost of terminal append-only batch folds. */
+  message_event_finalize_count?: number;
+  message_event_finalize_total_ms?: number;
+  message_event_finalize_max_ms?: number;
+  /** Compacted event count in the terminal message snapshot. */
+  message_event_final_event_count?: number;
+  message_event_persistence_error_count?: number;
   retry_original_failure_category?: TrackingRunFailureCategory;
   retry_original_failure_detail?: TrackingRunFailureDetail;
   retry_original_failure_stage?: TrackingRunFailureStage;
@@ -605,6 +659,7 @@ export interface RunRetryBaseProps {
   failure_category?: TrackingRunFailureCategory;
   failure_detail?: TrackingRunFailureDetail;
   failure_stage?: TrackingRunFailureStage;
+  terminal_trigger?: TrackingRunTerminalTrigger;
   error_code?: string;
 }
 
@@ -785,6 +840,27 @@ export interface ArtifactDeployResultProps {
   project_kind: TrackingProjectKind | null;
 }
 
+// Fired when a "Publish this file for everyone" attempt from the Share tab
+// resolves — publishing and unpublishing share the event, split by `action`.
+// Fires when the daemon call settles (success once the public URL is returned
+// for publish, or removal is confirmed for unpublish), regardless of whether a
+// newer request superseded this one in the UI. Clicking the publish button
+// reports separately as ui_click element 'publish_file'.
+export interface ArtifactPublishResultProps {
+  page_name: 'artifact';
+  area: 'share_option_popover';
+  artifact_id: string;
+  artifact_kind: TrackingArtifactKind;
+  action: 'publish' | 'unpublish';
+  result: TrackingExportResult;
+  // 'workspace_identity_required' when the workspace context could not be
+  // confirmed (the one actionable failure), 'publish_failed' otherwise.
+  error_code?: TrackingPublishErrorCode;
+  publish_duration_ms: number;
+  project_id: string;
+  project_kind: TrackingProjectKind | null;
+}
+
 // Outcome of an HTML file version restore from the version history modal.
 // Fires once per confirmed restore attempt (after the restore API settles) —
 // opening the confirm popover or cancelling it only reports ui_click.
@@ -835,6 +911,24 @@ export interface FeedbackSubmitResultProps {
   has_custom_reason: boolean;
   custom_reason?: string;
   result: TrackingResult;
+}
+
+export type TrackingConversationForkErrorCode =
+  | 'bad_request'
+  | 'permission_denied'
+  | 'fork_source_not_found'
+  | 'payload_too_large'
+  | 'server_error'
+  | 'http_error'
+  | 'network_error'
+  | 'empty_response'
+  | 'unknown_error';
+
+export interface ConversationForkResultProps extends ConversationForkAnalyticsContext {
+  target_conversation_id: string | null;
+  result: TrackingResult;
+  error_code?: TrackingConversationForkErrorCode;
+  duration_ms: number;
 }
 
 interface AssistantFeedbackBase {
@@ -906,6 +1000,31 @@ export interface AssistantFeedbackReasonSubmitProps
 export interface SettingsViewProps {
   page_name: TrackingSettingsPage;
   area: TrackingSettingsArea;
+}
+
+/**
+ * One diagnostic detection produced for one agent CLI. Answers, fleet-wide, the
+ * question a single bug report can only answer for one machine: how many
+ * installs of an agent someone installed cannot actually be used, and why.
+ *
+ * Carries no `page_name` on purpose. Detection is a daemon fact reported to
+ * whichever surface asked for the agent list; the surface is incidental to the
+ * failure and splitting by it would fragment the only number that matters.
+ *
+ * Carries no resolved path on purpose either — an agent binary path contains
+ * the OS username.
+ */
+export interface AgentDetectDiagnosticProps {
+  area: 'runtime_detection';
+  cli_provider_id: TrackingCliProviderId;
+  reason: AgentDiagnosticReason;
+  severity: AgentDiagnosticSeverity;
+  /** Warnings are not blocking, so availability is what separates them. */
+  agent_available: boolean;
+  /** The version detection read, when it read one. */
+  agent_version?: string;
+  /** A row with no path is hidden entirely — the user sees nothing to fix. */
+  has_path: boolean;
 }
 
 export interface SettingsCliTestResultProps {
@@ -1007,6 +1126,16 @@ export interface PackagedRuntimeFailedProps {
   // though the reason was sitting in a log we had already read. Scrubbed and
   // truncated like the other free-form fields.
   daemon_error?: string | null;
+  // The scrubbed, bounded tail of that same log, sent ONLY when the parse above
+  // produced nothing (no error_code, no missing_module, no daemon_error). That
+  // all-null combination is the largest startup-failure bucket in production
+  // (macOS daemon-start, 968 events / 293 people over the 14 days to
+  // 2026-08-22) and was previously undiagnosable: the reason was printed in a
+  // log we had already read and discarded because it matched no known pattern.
+  // Narrow by design — when the cause is already named, the raw tail is bytes
+  // and privacy surface for nothing, so a present value also *means* "this log
+  // defeated the parser".
+  daemon_log_tail?: string | null;
   // Node's system-error triplet read off the THROWN error object, as opposed to
   // `error_code`, which is parsed out of the sidecar log. A failed spawn or
   // socket op carries its real cause here (`UNKNOWN`/-4094/`spawn`,

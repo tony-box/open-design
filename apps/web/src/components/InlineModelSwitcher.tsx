@@ -34,6 +34,7 @@ import {
   type AmrEntryAttribution,
 } from '../analytics/amr-attribution';
 import { amrPlansUrlForProfile } from '../runtime/amr-guidance';
+import { isUnlimitedModelForPlanTier } from '../runtime/amr-unlimited-models';
 import { getResolvedDeviceId } from '../analytics/client';
 import {
   trackDeepSeekCampaignModelBenefitSurfaceView,
@@ -50,7 +51,9 @@ import {
   useWorkspaceBillingResponse,
   useWorkspaceContext,
   workspaceBillingBalanceUsd,
+  workspaceBillingSummaryForContext,
 } from '../collab/useWorkspaceContext';
+import { resolvePlanLabelTier } from '../collab/team-plan';
 import { KNOWN_PROVIDERS } from '../state/config';
 import { fetchProviderModels } from '../providers/provider-models';
 import { SUGGESTED_MODELS_BY_PROTOCOL } from '../state/apiProtocols';
@@ -76,6 +79,7 @@ import {
   AMR_LOGIN_STARTUP_SETTLE_MS,
   amrLoginPollOutcome,
   amrLoginStatusEventReason,
+  isAmrSessionAuthenticated,
   notifyAmrLoginStatusChanged,
 } from './amrLoginPolling';
 import { orderAgentsWithOpenDesignFirst } from './agentOrdering';
@@ -164,11 +168,11 @@ function markAmrReminderSeen(): void {
 }
 
 function displayAgentName(agent: Pick<AgentInfo, 'id' | 'name'>): string {
-  return agent.id === 'amr' ? 'Open Design' : agent.name;
+  return agent.id === 'amr' ? 'OpenDesign' : agent.name;
 }
 
 function displayAgentChipName(agent: Pick<AgentInfo, 'id' | 'name'>): string {
-  return agent.id === 'amr' ? 'Open Design' : displayAgentName(agent);
+  return agent.id === 'amr' ? 'OpenDesign' : displayAgentName(agent);
 }
 
 export function InlineModelSwitcher({
@@ -317,7 +321,7 @@ export function InlineModelSwitcher({
       const pendingStartup =
         amrLoginStartedAtRef.current !== null &&
         Date.now() - amrLoginStartedAtRef.current < AMR_LOGIN_STARTUP_SETTLE_MS;
-      if (next.loggedIn) {
+      if (isAmrSessionAuthenticated(next)) {
         amrLoginStartedAtRef.current = null;
         setAmrLoginPending(false);
       } else if (next.loginInFlight) {
@@ -557,7 +561,7 @@ export function InlineModelSwitcher({
         { metricsConsent: config.telemetry?.metrics === true },
       );
       const latest = await refreshAmrStatus();
-      if (latest?.loggedIn) return;
+      if (isAmrSessionAuthenticated(latest)) return;
       await handleAmrSignIn(attribution);
     },
     [
@@ -670,7 +674,7 @@ export function InlineModelSwitcher({
         if (next?.authAttemptId) {
           amrAuthAttemptIdRef.current = next.authAttemptId;
         }
-        if (next?.loggedIn) {
+        if (isAmrSessionAuthenticated(next)) {
           amrLoginStartedAtRef.current = null;
           stopAmrPolling();
           return;
@@ -728,6 +732,72 @@ export function InlineModelSwitcher({
       : configuredModelId ?? defaultAgentModelId(currentAgent);
   const currentModelOption =
     currentAgentModels.find((m) => m.id === currentModelId) ?? null;
+  // `agentId` and `agentModels` intentionally retain the last local-agent
+  // choice while BYOK is active so switching back restores that choice. Do
+  // not let campaign UI read that dormant AMR state: in BYOK mode the visible
+  // model comes from `config.model` and usage is billed by the user's provider.
+  const deepSeekCampaignVisibleForCurrentExecution =
+    campaignVisibility.visible
+    && config.mode === 'daemon'
+    && currentAgent?.id === 'amr';
+
+  // The 「无限使用」 badge has TWO sources and the campaign is only one of them.
+  // The standing one is the subscription itself: Pricing sells an unlimited set
+  // per tier (3 models on Go … 8 on Max), so a Pro subscriber's Kimi K2.7 Code
+  // is unlimited whether or not a campaign is running. Wiring the badge to the
+  // campaign alone left every one of those models unmarked.
+  const planTier = resolvePlanLabelTier({
+    billing: workspaceBillingSummaryForContext(
+      workspaceBillingResponse,
+      workspaceContext,
+    ),
+    context: workspaceContext,
+    // Account-scoped plan is a personal-workspace answer only — a team
+    // workspace's entitlement is never named by the signed-in account's tier.
+    accountPlan:
+      workspaceContextLoading || workspaceContext?.workspaceType === 'team'
+        ? null
+        : amrStatus?.account?.plan,
+  });
+  const unlimitedBadgeForModel = useCallback(
+    (
+      modelId: string | null | undefined,
+    ): { label: string; tooltip: string | null; stateClass: string } | null => {
+      // Same guard the campaign uses: in BYOK mode the visible model is billed
+      // by the user's own provider, and the dormant AMR selection must not
+      // leak an entitlement claim onto it.
+      if (config.mode !== 'daemon' || currentAgent?.id !== 'amr') return null;
+      if (
+        deepSeekCampaignVisibleForCurrentExecution
+        && isDeepSeekV4FlashCampaignModel(modelId)
+      ) {
+        return {
+          label: campaignModelBadge,
+          tooltip: campaignModelTooltip,
+          stateClass: campaignBadgeStateClass,
+        };
+      }
+      if (!isUnlimitedModelForPlanTier(modelId, planTier)) return null;
+      // Badge text only — the campaign's rule-summary tooltip is campaign copy
+      // and there is no product-written line for the plan case, so this branch
+      // carries no tooltip rather than an invented one.
+      return {
+        label: t('inlineSwitcher.unlimitedBadge'),
+        tooltip: null,
+        stateClass: '',
+      };
+    },
+    [
+      campaignBadgeStateClass,
+      campaignModelBadge,
+      campaignModelTooltip,
+      config.mode,
+      currentAgent?.id,
+      deepSeekCampaignVisibleForCurrentExecution,
+      planTier,
+      t,
+    ],
+  );
 
   useEffect(() => {
     if (!currentAgentId || !normalizedCurrentModelId) return;
@@ -799,29 +869,35 @@ export function InlineModelSwitcher({
       campaignBenefitTrackedForOpenRef.current = false;
       return;
     }
-    if (
-      !compact
-      || !campaignVisibility.visible
-      || campaignBenefitTrackedForOpenRef.current
-      || !compactModelRows.some(({ model }) => isDeepSeekV4FlashCampaignModel(model.id))
-    ) {
+    if (!compact || !deepSeekCampaignVisibleForCurrentExecution
+      || campaignBenefitTrackedForOpenRef.current) {
       return;
     }
+    // One impression per campaign model actually on screen, not one for the
+    // popover: the campaign runs two models and product compares their reach
+    // separately, so a single row-agnostic event would make Pro and Flash
+    // indistinguishable in the funnel.
+    const visibleCampaignModelIds = compactModelRows
+      .filter(({ model }) => isDeepSeekV4FlashCampaignModel(model.id))
+      .map(({ model }) => model.id);
+    if (visibleCampaignModelIds.length === 0) return;
     campaignBenefitTrackedForOpenRef.current = true;
-    trackDeepSeekCampaignModelBenefitSurfaceView(analytics.track, {
-      page_name: 'home',
-      area: 'execution_settings_popover',
-      element: 'deepseek_v4_flash_benefit',
-      campaign_id: 'deepseek_v4_flash',
-      user_state: campaignNeedsUpgrade ? 'unpaid' : 'paid',
-      model_id: 'deepseek-v4-flash',
-    });
+    for (const modelId of visibleCampaignModelIds) {
+      trackDeepSeekCampaignModelBenefitSurfaceView(analytics.track, {
+        page_name: 'home',
+        area: 'execution_settings_popover',
+        element: 'deepseek_v4_pro_benefit',
+        campaign_id: 'deepseek_v4_pro',
+        user_state: campaignNeedsUpgrade ? 'unpaid' : 'paid',
+        model_id: modelId,
+      });
+    }
   }, [
     analytics.track,
     campaignNeedsUpgrade,
-    campaignVisibility.visible,
     compact,
     compactModelRows,
+    deepSeekCampaignVisibleForCurrentExecution,
     open,
   ]);
 
@@ -838,7 +914,7 @@ export function InlineModelSwitcher({
         metricsConsent: config.telemetry?.metrics === true,
         ...(campaignNeedsUpgrade
           ? {
-              campaignId: 'deepseek_v4_flash' as const,
+              campaignId: 'deepseek_v4_pro' as const,
               conversionSource: 'deepseek_model_switcher_upgrade' as const,
             }
           : {}),
@@ -868,7 +944,7 @@ export function InlineModelSwitcher({
     config.installationId,
     config.telemetry?.metrics,
   ]);
-  const amrLoggedIn = amrStatus?.loggedIn === true;
+  const amrLoggedIn = isAmrSessionAuthenticated(amrStatus);
 
   useEffect(() => {
     if (!amrLoggedIn || workspaceContext?.workspaceType === 'team') {
@@ -1073,6 +1149,8 @@ export function InlineModelSwitcher({
           : t('inlineSwitcher.modelDefault')
       : config.model.trim() || t('inlineSwitcher.modelDefault');
 
+  const chipUnlimitedBadge = unlimitedBadgeForModel(currentModelId);
+
   // Compact home chip surfaces the selected model name + a connection-status
   // dot; label/tooltip fall back to the agent name. In CLI mode the agent's
   // `available` flag is the connection signal (reachable on PATH); API/BYOK is
@@ -1162,14 +1240,19 @@ export function InlineModelSwitcher({
               aria-hidden="true"
             />
             <span className="inline-switcher__chip-model-name">{chipModel}</span>
-            {campaignVisibility.visible && isDeepSeekV4FlashCampaignModel(currentModelId) ? (
+            {chipUnlimitedBadge ? (
               <span
-                className={`inline-switcher__campaign-badge od-tooltip${campaignBadgeStateClass}`}
-                data-tooltip={campaignModelTooltip}
-                data-tooltip-placement="top"
-                aria-label={campaignModelTooltip}
+                className={
+                  'inline-switcher__campaign-badge'
+                  + (chipUnlimitedBadge.tooltip ? ' od-tooltip' : '')
+                  + chipUnlimitedBadge.stateClass
+                }
+                data-tooltip={chipUnlimitedBadge.tooltip ?? undefined}
+                data-tooltip-placement={chipUnlimitedBadge.tooltip ? 'top' : undefined}
+                aria-label={chipUnlimitedBadge.tooltip ?? undefined}
+                data-testid="inline-model-switcher-chip-unlimited-badge"
               >
-                {campaignModelBadge}
+                {chipUnlimitedBadge.label}
               </span>
             ) : null}
           </>
@@ -1390,8 +1473,7 @@ export function InlineModelSwitcher({
                     // A model above the caller's plan is shown, but honestly:
                     // disabled with the reason the settings picker already uses,
                     // never as a normal row whose click gets reverted.
-                    const campaignModel = campaignVisibility.visible
-                      && isDeepSeekV4FlashCampaignModel(m.id);
+                    const unlimitedBadge = unlimitedBadgeForModel(m.id);
                     const lockedHint = selectable
                       ? null
                       : t('settings.amrModelUpgradeHint');
@@ -1451,14 +1533,19 @@ export function InlineModelSwitcher({
                           <span className="inline-switcher__agent-name">
                             {m.label}
                           </span>
-                          {campaignModel ? (
+                          {unlimitedBadge ? (
                             <span
-                              className={`inline-switcher__campaign-badge od-tooltip${campaignBadgeStateClass}`}
-                              data-tooltip={campaignModelTooltip}
-                              data-tooltip-placement="top"
-                              aria-label={campaignModelTooltip}
+                              className={
+                                'inline-switcher__campaign-badge'
+                                + (unlimitedBadge.tooltip ? ' od-tooltip' : '')
+                                + unlimitedBadge.stateClass
+                              }
+                              data-tooltip={unlimitedBadge.tooltip ?? undefined}
+                              data-tooltip-placement={unlimitedBadge.tooltip ? 'top' : undefined}
+                              aria-label={unlimitedBadge.tooltip ?? undefined}
+                              data-testid={`inline-model-switcher-unlimited-badge-${m.id}`}
                             >
-                              {campaignModelBadge}
+                              {unlimitedBadge.label}
                             </span>
                           ) : null}
                           {lockedHint ? (
@@ -1563,7 +1650,7 @@ export function InlineModelSwitcher({
                     type="button"
                     role="radio"
                     aria-checked={config.agentId === 'amr'}
-                    aria-label={`Open Design ${amrInlineStatus}`}
+                    aria-label={`OpenDesign ${amrInlineStatus}`}
                     className="inline-switcher__account-id inline-switcher__account-select"
                     data-testid="inline-model-switcher-agent-amr"
                     title={amrLoginPending ? amrPendingHoverLabel : undefined}
@@ -1582,7 +1669,7 @@ export function InlineModelSwitcher({
                     <span className="inline-switcher__account-text">
                       <span className="inline-switcher__account-name-row">
                         <span className="inline-switcher__account-name">
-                          Open Design
+                          OpenDesign
                         </span>
                         {amrLoggedIn ? (
                           <PlanBadge plan={amrPlanLabel} size="md" />

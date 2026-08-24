@@ -14,6 +14,8 @@ import { isFreePlanTier } from '../collab/team-plan';
 import { AmrArtifactUpgradeDialog } from './AmrArtifactUpgradeDialog';
 
 interface Props {
+  /** Whether the currently selected chat model runs on OpenDesign Cloud. */
+  cloudModelSelected: boolean;
   /**
    * The resolved raw plan id (see `resolvePlanTier`), NOT vela's account-scoped
    * `account.plan` — a team member reads `free` there while their team holds a
@@ -70,6 +72,7 @@ function homeOfferForRoute(
 }
 
 export function AmrArtifactUpgradeGate({
+  cloudModelSelected,
   plan,
   planResolved,
   profile,
@@ -110,6 +113,7 @@ export function AmrArtifactUpgradeGate({
         !detail
         || typeof detail.runId !== 'string'
         || !detail.runId.trim()
+        || detail.agentId !== 'amr'
         || !sessionKey
         || detail.result !== 'success'
         || !Number.isFinite(detail.artifactCount)
@@ -136,6 +140,7 @@ export function AmrArtifactUpgradeGate({
         !sessionKey
         || detail.source !== 'chat_send'
         || !eligibleSessionsRef.current.has(sessionKey)
+        || !cloudModelSelected
         || !planResolved
         || !isFreePlanTier(plan)
       ) {
@@ -158,7 +163,7 @@ export function AmrArtifactUpgradeGate({
     };
     window.addEventListener(AMR_ARTIFACT_UPGRADE_REQUEST_EVENT, handleRequest);
     return () => window.removeEventListener(AMR_ARTIFACT_UPGRADE_REQUEST_EVENT, handleRequest);
-  }, [plan, planResolved]);
+  }, [cloudModelSelected, plan, planResolved]);
 
   useEffect(() => {
     const pending = pendingSendRef.current;
@@ -166,7 +171,7 @@ export function AmrArtifactUpgradeGate({
 
     // Billing status can be unavailable while the Vela account remains
     // logged in. An unknown plan must never leave an intercepted Send hanging.
-    if (!planResolved || !isFreePlanTier(plan)) {
+    if (!cloudModelSelected || !planResolved || !isFreePlanTier(plan)) {
       pendingSendRef.current = null;
       pending.settle('proceed');
       return;
@@ -184,7 +189,7 @@ export function AmrArtifactUpgradeGate({
     promptedSessionsRef.current.add(pending.sessionKey);
     openRef.current = true;
     setDialogSessionKey(pending.sessionKey);
-  }, [pendingRevision, plan, planResolved]);
+  }, [cloudModelSelected, pendingRevision, plan, planResolved]);
 
   useEffect(() => {
     const previous = previousSurfaceRef.current;
@@ -209,24 +214,24 @@ export function AmrArtifactUpgradeGate({
 
   useEffect(() => {
     if (!pendingHomeOffer || !planResolved) return;
-    if (isFreePlanTier(plan) && !hasOpenModal()) {
+    if (cloudModelSelected && isFreePlanTier(plan) && !hasOpenModal()) {
       homeOfferedSessionsRef.current.add(pendingHomeOffer.sessionKey);
       promptedSessionsRef.current.add(pendingHomeOffer.sessionKey);
       onHomeOfferChange?.(pendingHomeOffer);
     }
     setPendingHomeOffer(null);
-  }, [onHomeOfferChange, pendingHomeOffer, plan, planResolved]);
+  }, [cloudModelSelected, onHomeOfferChange, pendingHomeOffer, plan, planResolved]);
 
   useEffect(() => {
-    if (!planResolved || isFreePlanTier(plan)) return;
+    if (cloudModelSelected && (!planResolved || isFreePlanTier(plan))) return;
     onHomeOfferChange?.(null);
     if (!dialogSessionKey) return;
     const pending = pendingSendRef.current;
     pendingSendRef.current = null;
-    pending?.settle('cancel');
+    pending?.settle(cloudModelSelected ? 'cancel' : 'proceed');
     openRef.current = false;
     setDialogSessionKey(null);
-  }, [dialogSessionKey, onHomeOfferChange, plan, planResolved]);
+  }, [cloudModelSelected, dialogSessionKey, onHomeOfferChange, plan, planResolved]);
 
   useEffect(() => () => {
     const pending = pendingSendRef.current;

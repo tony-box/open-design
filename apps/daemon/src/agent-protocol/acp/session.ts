@@ -59,6 +59,14 @@ import {
   modelSelectionErrorIsRecoverable,
 } from './models.js';
 import { buildAcpSessionNewParams, buildPromptBlocks, type AcpMcpServerInput } from './session-params.js';
+import { withholdStdioMcpServersForBuild } from './stdio-mcp.js';
+import { createVelaChildEvidenceConsumer } from '../../runtimes/vela-child-evidence.js';
+
+const NON_DISPLAYABLE_ACP_SESSION_UPDATES = new Set([
+  'usage_update',
+  'session_info_update',
+  'available_commands_update',
+]);
 
 /**
  * Options for `attachAcpSession`. All fields except `child`, `prompt`, and
@@ -70,9 +78,17 @@ export interface AttachAcpSessionOptions {
   cwd?: string;
   model?: string | null;
   imagePaths?: string[];
+  /** Frozen non-image/image resources delivered as ACP resource_link blocks. */
+  resourcePaths?: string[];
   mcpServers?: AcpMcpServerInput[];
   // Passed through to buildAcpSessionNewParams — see AcpSessionOptions.
   envFormat?: 'array' | 'map';
+  // First version of this agent that rejects stdio MCP servers on `session/new`
+  // (`RuntimeAgentDef.acpStdioMcpRemovedInVersion`). When set, stdio entries are
+  // withheld from any build at or above it, judged against the version the agent
+  // reports in its own `initialize` result. Leave unset for agents that accept
+  // stdio MCP servers at every version.
+  stdioMcpRemovedInVersion?: string | null;
   send: (event: string, payload: unknown) => void;
   clientName?: string;
   clientVersion?: string;
@@ -130,8 +146,10 @@ export function attachAcpSession({
   cwd,
   model,
   imagePaths = [],
+  resourcePaths = [],
   mcpServers,
   envFormat = 'array',
+  stdioMcpRemovedInVersion,
   send,
   clientName = 'open-design',
   clientVersion = 'runtime-adapter',
@@ -172,6 +190,7 @@ export function attachAcpSession({
   let emittedTextBuffer = '';
   let rawAcpShapeDiagnosticCount = 0;
   let artifactSuppressionDiagnosticCount = 0;
+  let velaChildRejectionDiagnosticCount = 0;
   let amrStderrRetryTail = '';
   let finished = false;
   let fatal = false;
@@ -196,6 +215,22 @@ export function attachAcpSession({
     openedBlocks: 0,
     closedBlocks: 0,
   };
+  // The AMR discriminator is deliberately required here. A generic ACP agent
+  // advertising a same-named extension must not silently expand the daemon's
+  // accepted protocol surface.
+  const velaChildEvidenceConsumer = modelUnavailableErrorCode
+    ? createVelaChildEvidenceConsumer({
+        onFact: (fact) => {
+          send('agent', {
+            type: 'diagnostic',
+            name: 'vela_opencode_child_agent_lifecycle',
+            source: 'amr-opencode',
+            elapsedMs: Date.now() - runStartedAt,
+            ...fact,
+          });
+        },
+      })
+    : null;
   const acpArtifactWriteToolCallIds = new Set<string>();
   // Per toolCallId: accumulate name/input/path/result across partial ACP frames
   // and emit exactly one tool_use + one tool_result at terminal status (or on
@@ -566,7 +601,7 @@ export function attachAcpSession({
       'session/prompt',
       {
         sessionId,
-        prompt: buildPromptBlocks(prompt, imagePaths),
+        prompt: buildPromptBlocks(prompt, [...resourcePaths, ...imagePaths]),
       },
       'session/prompt',
     );
@@ -613,7 +648,7 @@ export function attachAcpSession({
     clearStageTimer();
     stdin.end();
     // Some ACP agents keep the child process alive after stdin closes,
-    // waiting for another prompt. Each Open Design run owns one process per
+    // waiting for another prompt. Each OpenDesign run owns one process per
     // turn, so close it once this prompt is cleanly complete.
     const cleanExitTimer = setTimeout(() => {
       if (!child.killed) child.kill('SIGTERM');
@@ -712,7 +747,37 @@ export function attachAcpSession({
           return;
         }
       }
+      const velaChildResult = velaChildEvidenceConsumer?.observe({
+        expectedAcpSessionId: sessionId,
+        envelopeAcpSessionId: params?.sessionId,
+        update,
+      });
+      if (velaChildResult?.handled) {
+        if (
+          velaChildResult.reason &&
+          velaChildRejectionDiagnosticCount < ACP_RAW_EVENT_SHAPE_DIAGNOSTIC_LIMIT
+        ) {
+          velaChildRejectionDiagnosticCount += 1;
+          send('agent', {
+            type: 'diagnostic',
+            name: 'vela_opencode_child_evidence_rejected',
+            source: 'amr-opencode',
+            elapsedMs: Date.now() - runStartedAt,
+            reason: velaChildResult.reason,
+          });
+        }
+        // Accepted facts are emitted by onFact. Rejected child frames must not
+        // fall through to generic status/raw diagnostics, which could copy
+        // unallowlisted producer fields.
+        return;
+      }
       if (emitAcpExecutionObservability(update)) {
+        return;
+      }
+      if (
+        typeof update.sessionUpdate === 'string' &&
+        NON_DISPLAYABLE_ACP_SESSION_UPDATES.has(update.sessionUpdate)
+      ) {
         return;
       }
       if (update.sessionUpdate !== 'agent_message_chunk' && update.sessionUpdate !== 'agent_thought_chunk') {
@@ -912,6 +977,16 @@ export function attachAcpSession({
       return;
     }
     if (expectedId === 1) {
+      const negotiation = velaChildEvidenceConsumer?.negotiate(result);
+      if (negotiation?.advertised) {
+        send('agent', {
+          type: 'diagnostic',
+          name: 'vela_opencode_child_evidence_capability',
+          source: 'amr-opencode',
+          elapsedMs: Date.now() - runStartedAt,
+          ...negotiation,
+        });
+      }
       expectedId = nextId;
       if (resumeSessionId) {
         // Resume the prior upstream session instead of creating a fresh one.
@@ -922,12 +997,34 @@ export function attachAcpSession({
           'session/load',
         );
       } else {
+        // The build that just answered `initialize` is the one about to parse
+        // `session/new`, so the version it reports for itself is the authority
+        // on which MCP transports this payload may carry. Preferred over any
+        // earlier `--version` probe, which can be stale by the time a run
+        // starts (upgrade between probe and run, PATH shim, detection refresh).
+        const agentInfo = (result as { agentInfo?: { version?: unknown } }).agentInfo;
+        const reportedVersion =
+          typeof agentInfo?.version === 'string' ? agentInfo.version : null;
+        const sessionMcp = mcpServers
+          ? withholdStdioMcpServersForBuild(mcpServers, {
+              reportedVersion,
+              removedInVersion: stdioMcpRemovedInVersion,
+            })
+          : null;
+        if (sessionMcp && sessionMcp.withheldNames.length > 0) {
+          // Daemon-log only: the transcript is user-facing and localized, and a
+          // withheld MCP server is an operator-diagnostic detail, not something
+          // the user can act on mid-turn.
+          console.warn(
+            `[acp] agent build ${reportedVersion ?? 'unknown'} does not accept stdio MCP servers; withheld ${sessionMcp.withheldNames.join(', ')}`,
+          );
+        }
         writeRpc(
           nextId,
           'session/new',
           buildAcpSessionNewParams(
             effectiveCwd,
-            mcpServers ? { mcpServers, envFormat } : { envFormat },
+            sessionMcp ? { mcpServers: sessionMcp.servers, envFormat } : { envFormat },
           ),
           'session/new',
         );
@@ -1041,10 +1138,31 @@ export function attachAcpSession({
     clientInfo: { name: clientName, version: clientVersion },
   }, 'initialize');
 
+  /**
+   * The prompt request resolved without a fatal protocol/transport error and
+   * without an abort. Any other ending may have dropped ACP updates that were
+   * still in flight, so evidence collected in this run cannot claim to be
+   * complete.
+   */
+  const promptCompletedCleanly = () => finished && !fatal && !aborted;
+
   return {
     /** Returns `true` when the session ended with a fatal protocol or transport error, allowing the caller to surface the failure. */
     hasFatalError() {
       return fatal;
+    },
+    /**
+     * Child-evidence coverage for this ACP run, or `undefined` when the agent
+     * is not the AMR-discriminated runtime and therefore has no child-evidence
+     * consumer. The daemon publishes this as the `child_evidence_coverage_v1`
+     * diagnostic at child close; without it every AMR task aggregates as
+     * `child_lifecycle_unavailable_not_zero`, which cannot distinguish a run
+     * that had no Child agents from a run nobody was observing.
+     */
+    childEvidenceCoverage() {
+      return velaChildEvidenceConsumer?.childEvidenceCoverage({
+        sessionComplete: promptCompletedCleanly(),
+      });
     },
     // The durable upstream session handle to persist for resume, or null when
     // none was reported (older agents, or a handshake that never established a
@@ -1059,7 +1177,7 @@ export function attachAcpSession({
       // and was not aborted. The chat consumer treats this as a successful
       // run even if the child process subsequently exited via SIGTERM
       // (which is expected for agents that don't shut down on stdin.end()).
-      return finished && !fatal && !aborted;
+      return promptCompletedCleanly();
     },
     /**
      * Aborts an in-progress ACP session. Sends `session/cancel` when a session

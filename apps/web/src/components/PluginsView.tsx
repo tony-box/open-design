@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
   type SetStateAction,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { Dialog } from '@open-design/components';
 import {
   PLUGIN_SHARE_ACTION_PLUGIN_IDS,
@@ -43,7 +44,10 @@ import {
   trackExtensionMarketplaceClick,
   trackWorkspaceResourceActionResult,
 } from '../analytics/events';
-import { workspaceAnalyticsDimensions } from '../analytics/workspace';
+import {
+  stableAnalyticsRequestErrorCode,
+  workspaceAnalyticsDimensions,
+} from '../analytics/workspace';
 import type { TrackingWorkspaceScope } from '@open-design/contracts/analytics';
 import {
   addPluginMarketplace,
@@ -189,22 +193,22 @@ const PLUGIN_SHARE_DETAILS: Record<PluginShareAction, {
     eyebrow: 'GitHub repository',
     fallbackTitle: 'Publish Plugin to GitHub',
     fallbackDescription:
-      'Creates a public GitHub repository for this local Open Design plugin.',
+      'Creates a public GitHub repository for this local OpenDesign plugin.',
     confirmLabel: 'Start publishing',
     steps: [
-      'Create a new Open Design project for the publish workflow.',
+      'Create a new OpenDesign project for the publish workflow.',
       'Copy this plugin into that project as isolated source context.',
       'Run the official publish action plugin against the local daemon.',
     ],
   },
   'contribute-open-design': {
-    eyebrow: 'Open Design pull request',
-    fallbackTitle: 'Contribute Plugin to Open Design',
+    eyebrow: 'OpenDesign pull request',
+    fallbackTitle: 'Contribute Plugin to OpenDesign',
     fallbackDescription:
-      'Opens a pull request that adds this plugin to the Open Design community catalog.',
+      'Opens a pull request that adds this plugin to the OpenDesign community catalog.',
     confirmLabel: 'Start contribution',
     steps: [
-      'Create a new Open Design project for the contribution workflow.',
+      'Create a new OpenDesign project for the contribution workflow.',
       'Copy this plugin into that project as isolated source context.',
       'Run the official contribution action plugin against the local daemon.',
     ],
@@ -219,6 +223,16 @@ interface PluginsViewProps {
     action: PluginShareAction,
     locale?: string,
   ) => Promise<PluginShareProjectOutcome>;
+}
+
+function resourceActionAnalyticsErrorCode(
+  error: { code?: string; errorCode?: string; status?: number },
+  fallback: string,
+): string {
+  return stableAnalyticsRequestErrorCode({
+    code: error.errorCode ?? error.code,
+    status: error.status,
+  }, fallback);
 }
 
 export function PluginsView({
@@ -1213,9 +1227,10 @@ export function ExtensionsMarketplace({
         if ('error' in result) {
           trackResourceResult({
             kind: 'skill', scope: 'personal', action: 'add', result: 'failed',
-            startedAt, errorCode: 'import_failed',
+            startedAt,
+            errorCode: resourceActionAnalyticsErrorCode(result.error, 'import_failed'),
           });
-          setToast({ message: result.error || t('pluginsView.importFailed'), tone: 'error' });
+          setToast({ message: result.error.message || t('pluginsView.importFailed'), tone: 'error' });
           return;
         }
         await refresh();
@@ -1250,7 +1265,8 @@ export function ExtensionsMarketplace({
         setToast({ message: outcome.message || t('pluginsView.importFailed'), tone: 'error' });
         trackResourceResult({
           kind: 'expert_plugin', scope: 'personal', action: 'add', result: 'failed',
-          startedAt, errorCode: 'import_failed',
+          startedAt,
+          errorCode: resourceActionAnalyticsErrorCode(outcome, 'import_failed'),
         });
       }
     } finally {
@@ -1279,7 +1295,8 @@ export function ExtensionsMarketplace({
           setToast({ message: outcome.message || t('pluginsView.uploadFailed'), tone: 'error' });
           trackResourceResult({
             kind: 'expert_plugin', scope: 'personal', action: 'add', result: 'failed',
-            startedAt, errorCode: 'upload_failed',
+            startedAt,
+            errorCode: resourceActionAnalyticsErrorCode(outcome, 'upload_failed'),
           });
         }
         return;
@@ -1303,7 +1320,8 @@ export function ExtensionsMarketplace({
       if ('error' in result) {
         trackResourceResult({
           kind: 'skill', scope: 'personal', action: 'add', result: 'failed',
-          startedAt, errorCode: 'import_failed',
+          startedAt,
+          errorCode: resourceActionAnalyticsErrorCode(result.error, 'import_failed'),
         });
         setToast({ message: result.error.message, tone: 'error' });
         return;
@@ -1766,7 +1784,7 @@ export function ExtensionsMarketplace({
           action: 'add',
           result: 'failed',
           startedAt,
-          errorCode: 'install_failed',
+          errorCode: resourceActionAnalyticsErrorCode(outcome, 'install_failed'),
         });
       }
     } catch {
@@ -2018,7 +2036,7 @@ export function ExtensionsMarketplace({
         skill={selectedSkill}
         author={
           scope === 'official'
-            ? 'Open Design'
+            ? 'OpenDesign'
             : scope === 'team'
               ? 'Nexu Team'
               : t('chat.you')
@@ -3198,7 +3216,7 @@ function AvailablePluginDetailsModal({
     });
   }
 
-  return (
+  const modal = (
     <div
       className="plugin-details-modal-backdrop"
       role="dialog"
@@ -3271,7 +3289,7 @@ function AvailablePluginDetailsModal({
                 </h3>
               </div>
               <p className="plugin-details-modal__section-hint">
-                This official catalog entry is bundled with Open Design and is ready to use.
+                This official catalog entry is bundled with OpenDesign and is ready to use.
               </p>
             </section>
           ) : (
@@ -3502,6 +3520,9 @@ function AvailablePluginDetailsModal({
       </div>
     </div>
   );
+
+  if (typeof document === 'undefined') return modal;
+  return createPortal(modal, document.body);
 }
 
 function SourcesPanel({
@@ -3700,7 +3721,9 @@ function PluginImportModal({
           area: 'import_modal',
           import_source: kind,
           result: outcome.ok ? 'success' : 'failed',
-          ...(outcome.ok ? {} : { error_code: outcome.message ?? 'unknown' }),
+          ...(outcome.ok ? {} : {
+            error_code: resourceActionAnalyticsErrorCode(outcome, 'install_failed'),
+          }),
         });
       }
     } finally {
@@ -3942,11 +3965,12 @@ function buildAvailablePlugins(
     return entries.flatMap((entry) => {
       const installedPlugin = installedByName.get(normalizePluginName(entry.name)) ?? null;
       if (installedPlugin && installedPlugin.sourceKind !== 'bundled') return [];
-      const installedRecord = installedPlugin && bundledPluginMatchesMarketplaceEntry(
-        installedPlugin,
-        marketplace,
-        entry,
-      )
+      // The daemon never permits a scoped install to replace a bundled plugin,
+      // regardless of which marketplace advertises the colliding entry. Treat
+      // the already-bundled record as installed whenever the normal lookup keys
+      // match, otherwise the UI offers an Install action that can only download,
+      // parse, and finally fail with "Bundled plugin cannot be replaced".
+      const installedRecord = installedPlugin?.sourceKind === 'bundled'
         ? installedPlugin
         : null;
       return [{
@@ -3957,16 +3981,6 @@ function buildAvailablePlugins(
       }];
     });
   });
-}
-
-function bundledPluginMatchesMarketplaceEntry(
-  plugin: InstalledPluginRecord,
-  marketplace: PluginMarketplace,
-  entry: PluginMarketplaceEntry,
-): boolean {
-  return plugin.sourceKind === 'bundled'
-    && plugin.sourceMarketplaceId === marketplace.id
-    && normalizePluginName(plugin.sourceMarketplaceEntryName ?? '') === normalizePluginName(entry.name);
 }
 
 function availablePluginTitle(entry: PluginMarketplaceEntry, locale?: string): string {
