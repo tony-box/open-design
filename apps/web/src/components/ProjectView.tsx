@@ -57,7 +57,6 @@ import {
   runAgentProviderId,
 } from '../analytics/run-task';
 import { useCoalescedCallback } from '../hooks/useCoalescedCallback';
-import { requestAmrArtifactUpgrade } from '../runtime/amr-artifact-upgrade';
 import {
   resolveQuestionFormStrategyTaskExecutionId,
   strategySettledMessageFields,
@@ -8595,17 +8594,9 @@ export function ProjectView({
       commentAttachments: ChatCommentAttachment[],
       meta?: ChatSendMeta,
     ): Promise<ChatSendOutcome> => {
-      if (activeConversationId && cloudModelSelected) {
-        const decision = await requestAmrArtifactUpgrade({
-          projectId: project.id,
-          conversationId: activeConversationId,
-          source: 'chat_send',
-        });
-        if (decision === 'cancel') return 'restore-draft';
-      }
       void handleSend(prompt, attachments, commentAttachments, meta);
     },
-    [activeConversationId, cloudModelSelected, handleSend, project.id],
+    [handleSend],
   );
 
   // Cancel every in-flight run for the current conversation (the user's own

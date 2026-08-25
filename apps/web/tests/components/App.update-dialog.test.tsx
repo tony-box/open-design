@@ -61,10 +61,6 @@ vi.mock('../../src/components/SettingsDialog', () => ({
   SettingsDialog: () => null,
 }));
 
-vi.mock('../../src/components/AmrArtifactUpgradeGate', () => ({
-  AmrArtifactUpgradeGate: () => null,
-}));
-
 vi.mock('../../src/providers/registry', async () => {
   const actual = await vi.importActual<typeof import('../../src/providers/registry')>(
     '../../src/providers/registry',

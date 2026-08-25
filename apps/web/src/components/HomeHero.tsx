@@ -55,7 +55,6 @@ import {
   type HomeHeroChip,
 } from './home-hero/chips';
 import { homeHeroChipLabel } from './home-hero/chip-labels';
-import { PixelScanLogo } from './home-hero/PixelScanLogo';
 import { ScenarioArt } from './home-hero/ScenarioArt';
 import { useEdgeAutoScroll, EdgeScrollZones } from './home-hero/EdgeAutoScroll';
 import {
@@ -1290,12 +1289,14 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
   return (
     <section ref={homeHeroRef} className="home-hero" data-testid="home-hero">
       {/* #5517 hero header: the OpenDesign logotype replaces the small
-          brand-mark + name pair, and the tagline subtitle is dropped. The
-          static wordmark is now a WebGL pixel-scan effect (round 7) — the
-          title heading below it is dropped too, since the animated wordmark
-          alone carries the brand moment. */}
+          brand-mark + name pair, and the tagline subtitle is dropped. */}
       <span className="home-hero__logo-wrap">
-        <PixelScanLogo className="home-hero__logo home-hero__logo--tiles" />
+        <img
+          className="home-hero__logo"
+          src="/logo-scan.svg"
+          alt="OpenDesign"
+          draggable={false}
+        />
       </span>
 
       {/* Capsule type row: the 10 top-level create-scenario types as pill chips above

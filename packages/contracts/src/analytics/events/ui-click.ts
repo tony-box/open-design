@@ -6,7 +6,7 @@ import type { DesignSystemEnrichClickProps, TrackingDesignSystemEditSurface } fr
 import type { TrackingPageName, TrackingSettingsPage } from './event-names.js';
 import type { OnboardingClickProps, TrackingOnboardingFirstLoopStep, TrackingOnboardingProductType, TrackingOnboardingRole, TrackingOnboardingUseCase } from './onboarding.js';
 import type { TrackingRunRecoveryActionType } from './result-events.js';
-import type { TrackingAmrEntrySource, TrackingArtifactKind, TrackingByokProviderId, TrackingCampaignConversionSource, TrackingCampaignId, TrackingCampaignUserState, TrackingCliProviderId, TrackingExecutionMode, TrackingExportFormat, TrackingFeedbackProviderId, TrackingNewProjectTab, TrackingProjectKind, TrackingProjectSource } from './shared-enums.js';
+import type { TrackingAmrEntrySource, TrackingArtifactKind, TrackingByokProviderId, TrackingCampaignConversionSource, TrackingCampaignId, TrackingCliProviderId, TrackingExecutionMode, TrackingExportFormat, TrackingFeedbackProviderId, TrackingNewProjectTab, TrackingProjectKind, TrackingProjectSource } from './shared-enums.js';
 import type { AccountMenuClickProps, CommunityTemplateClickProps, EntryNavigationClickProps, ExtensionMarketplaceClickProps, ProjectCollectionClickProps, TrackingWorkspaceScope, WorkspaceInviteClickProps, WorkspaceSwitcherClickProps } from './workspace.js';
 // ---- ui_click ------------------------------------------------------------
 //
@@ -961,22 +961,6 @@ export interface AmrEntryClickProps {
   conversion_source?: TrackingCampaignConversionSource;
 }
 
-export interface DeepSeekCampaignModalClickProps {
-  page_name: 'home';
-  area: 'deepseek_campaign_modal';
-  element: 'close' | 'later' | 'use_now' | 'upgrade';
-  campaign_id: TrackingCampaignId;
-  user_state: TrackingCampaignUserState;
-}
-
-export interface DeepSeekCampaignBadgeClickProps {
-  page_name: 'home';
-  area: 'campaign_badge';
-  element: 'open_pricing';
-  campaign_id: TrackingCampaignId;
-  user_state: TrackingCampaignUserState;
-}
-
 // Terminal outcome of one AMR (vela) sign-in attempt, fired exactly once
 // per attempt when the login poll loop settles. This is the main-app-side
 // completion signal that pairs with the amr_entry click: dashboards count
@@ -1686,8 +1670,6 @@ export type UiClickProps =
   | RunFailedToastClickProps
   | RunRecoveryActionClickProps
   | AmrEntryClickProps
-  | DeepSeekCampaignModalClickProps
-  | DeepSeekCampaignBadgeClickProps
   | ChatPanelResourcesPopoverClickProps
   | ChatPanelMessageQueueClickProps
   | FileManagerClickProps

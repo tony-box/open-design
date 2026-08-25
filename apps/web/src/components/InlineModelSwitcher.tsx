@@ -37,7 +37,6 @@ import { amrPlansUrlForProfile } from '../runtime/amr-guidance';
 import { isUnlimitedModelForPlanTier } from '../runtime/amr-unlimited-models';
 import { getResolvedDeviceId } from '../analytics/client';
 import {
-  trackDeepSeekCampaignModelBenefitSurfaceView,
   trackExecutionSettingsPopoverClick,
 } from '../analytics/events';
 import {
@@ -98,8 +97,6 @@ import {
   providerModelsCacheKey,
   type ProviderModelsCache,
 } from './providerModelsCache';
-import { isDeepSeekV4FlashCampaignModel } from '../campaigns/deepseek-v4-flash';
-import { useDeepSeekV4FlashCampaignVisibility } from '../campaigns/use-deepseek-v4-flash-campaign';
 
 interface Props {
   config: AppConfig;
@@ -192,29 +189,6 @@ export function InlineModelSwitcher({
   const t = useT();
   const analytics = useAnalytics();
   // Both flags are reserved presentation branches with no trigger wired yet:
-  // `campaignRestricted` (已暂停 badge) is reserved for the backend
-  // usage-limit signal — no trigger wired yet — and `campaignNeedsUpgrade`
-  // (升级可用 badge) is reserved for a real unpaid-audience signal reaching
-  // this component. Until those land, every campaign badge renders the paid
-  // state.
-  const campaignRestricted = false;
-  const campaignNeedsUpgrade = false;
-  const campaignVisibility = useDeepSeekV4FlashCampaignVisibility();
-  const campaignModelBadge = campaignRestricted
-    ? t('campaign.deepseekV4Flash.restricted.modelBadge')
-    : campaignNeedsUpgrade
-      ? t('campaign.deepseekV4Flash.unpaid.modelBadge')
-      : t('campaign.deepseekV4Flash.paid.modelBadge');
-  const campaignModelTooltip = campaignRestricted
-    ? t('campaign.deepseekV4Flash.restricted.tooltip')
-    : campaignNeedsUpgrade
-      ? t('campaign.deepseekV4Flash.unpaid.tooltip')
-      : t('campaign.deepseekV4Flash.ruleSummary');
-  const campaignBadgeStateClass = campaignRestricted
-    ? ' is-restricted'
-    : campaignNeedsUpgrade
-      ? ' is-unpaid'
-      : '';
   // recvqfYKutwWlQ: gate the AMR upgrade entry on billing permission below,
   // not just plan tier — a team member without `canManageBilling` (owner-only)
   // can't act on an upgrade even when the tier itself is upgradeable.
@@ -226,7 +200,6 @@ export function InlineModelSwitcher({
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const popoverRef = useRef<HTMLDivElement | null>(null);
-  const campaignBenefitTrackedForOpenRef = useRef(false);
   // Viewport clamp for the popover (issue #99): the anchor chip can sit
   // anywhere on screen (home hero mid-page, chat composer at the bottom), so
   // a fixed downward placement runs past the screen edge once the model list
@@ -732,20 +705,10 @@ export function InlineModelSwitcher({
       : configuredModelId ?? defaultAgentModelId(currentAgent);
   const currentModelOption =
     currentAgentModels.find((m) => m.id === currentModelId) ?? null;
-  // `agentId` and `agentModels` intentionally retain the last local-agent
-  // choice while BYOK is active so switching back restores that choice. Do
-  // not let campaign UI read that dormant AMR state: in BYOK mode the visible
-  // model comes from `config.model` and usage is billed by the user's provider.
-  const deepSeekCampaignVisibleForCurrentExecution =
-    campaignVisibility.visible
-    && config.mode === 'daemon'
-    && currentAgent?.id === 'amr';
 
-  // The 「无限使用」 badge has TWO sources and the campaign is only one of them.
-  // The standing one is the subscription itself: Pricing sells an unlimited set
-  // per tier (3 models on Go … 8 on Max), so a Pro subscriber's Kimi K2.7 Code
-  // is unlimited whether or not a campaign is running. Wiring the badge to the
-  // campaign alone left every one of those models unmarked.
+  // The 「无限使用」 badge follows the subscription itself: Pricing sells an
+  // unlimited set per tier (3 models on Go … 8 on Max), so a Pro subscriber's
+  // Kimi K2.7 Code is unlimited for that tier.
   const planTier = resolvePlanLabelTier({
     billing: workspaceBillingSummaryForContext(
       workspaceBillingResponse,
@@ -762,38 +725,19 @@ export function InlineModelSwitcher({
   const unlimitedBadgeForModel = useCallback(
     (
       modelId: string | null | undefined,
-    ): { label: string; tooltip: string | null; stateClass: string } | null => {
-      // Same guard the campaign uses: in BYOK mode the visible model is billed
-      // by the user's own provider, and the dormant AMR selection must not
-      // leak an entitlement claim onto it.
+    ): { label: string; tooltip: string | null } | null => {
+      // In BYOK mode the visible model is billed by the user's own provider,
+      // and the dormant AMR selection must not leak an entitlement claim onto it.
       if (config.mode !== 'daemon' || currentAgent?.id !== 'amr') return null;
-      if (
-        deepSeekCampaignVisibleForCurrentExecution
-        && isDeepSeekV4FlashCampaignModel(modelId)
-      ) {
-        return {
-          label: campaignModelBadge,
-          tooltip: campaignModelTooltip,
-          stateClass: campaignBadgeStateClass,
-        };
-      }
       if (!isUnlimitedModelForPlanTier(modelId, planTier)) return null;
-      // Badge text only — the campaign's rule-summary tooltip is campaign copy
-      // and there is no product-written line for the plan case, so this branch
-      // carries no tooltip rather than an invented one.
       return {
         label: t('inlineSwitcher.unlimitedBadge'),
         tooltip: null,
-        stateClass: '',
       };
     },
     [
-      campaignBadgeStateClass,
-      campaignModelBadge,
-      campaignModelTooltip,
       config.mode,
       currentAgent?.id,
-      deepSeekCampaignVisibleForCurrentExecution,
       planTier,
       t,
     ],
@@ -864,60 +808,15 @@ export function InlineModelSwitcher({
     [currentAgent, inlineAgentModelOptions],
   );
 
-  useEffect(() => {
-    if (!open) {
-      campaignBenefitTrackedForOpenRef.current = false;
-      return;
-    }
-    if (!compact || !deepSeekCampaignVisibleForCurrentExecution
-      || campaignBenefitTrackedForOpenRef.current) {
-      return;
-    }
-    // One impression per campaign model actually on screen, not one for the
-    // popover: the campaign runs two models and product compares their reach
-    // separately, so a single row-agnostic event would make Pro and Flash
-    // indistinguishable in the funnel.
-    const visibleCampaignModelIds = compactModelRows
-      .filter(({ model }) => isDeepSeekV4FlashCampaignModel(model.id))
-      .map(({ model }) => model.id);
-    if (visibleCampaignModelIds.length === 0) return;
-    campaignBenefitTrackedForOpenRef.current = true;
-    for (const modelId of visibleCampaignModelIds) {
-      trackDeepSeekCampaignModelBenefitSurfaceView(analytics.track, {
-        page_name: 'home',
-        area: 'execution_settings_popover',
-        element: 'deepseek_v4_pro_benefit',
-        campaign_id: 'deepseek_v4_pro',
-        user_state: campaignNeedsUpgrade ? 'unpaid' : 'paid',
-        model_id: modelId,
-      });
-    }
-  }, [
-    analytics.track,
-    campaignNeedsUpgrade,
-    compact,
-    compactModelRows,
-    deepSeekCampaignVisibleForCurrentExecution,
-    open,
-  ]);
-
   /** Where a refused model pick sends the user instead — the same plans
    *  destination the settings picker's upgrade lock already opens. */
   const openAmrModelUpgrade = useCallback(() => {
     const attribution = recordAmrEntry(
       analytics.track,
-      campaignNeedsUpgrade
-        ? 'deepseek_model_switcher_upgrade'
-        : 'inline_amr_upgrade',
+      'inline_amr_upgrade',
       new Date(),
       {
         metricsConsent: config.telemetry?.metrics === true,
-        ...(campaignNeedsUpgrade
-          ? {
-              campaignId: 'deepseek_v4_pro' as const,
-              conversionSource: 'deepseek_model_switcher_upgrade' as const,
-            }
-          : {}),
       },
     );
     const deviceId = amrHandoffDeviceId({
@@ -939,7 +838,6 @@ export function InlineModelSwitcher({
   }, [
     amrStatus?.profile,
     analytics.track,
-    campaignNeedsUpgrade,
     config.agentCliEnv?.amr?.OPEN_DESIGN_AMR_PROFILE,
     config.installationId,
     config.telemetry?.metrics,
@@ -1142,11 +1040,9 @@ export function InlineModelSwitcher({
       : apiProtocolLabel(apiProtocol);
   const chipModel =
     config.mode === 'daemon'
-      ? isDeepSeekV4FlashCampaignModel(currentModelId)
-        ? currentModelLabel ?? 'DeepSeek V4 Flash'
-        : currentModelLabel && currentModelId !== 'default'
-          ? currentModelLabel
-          : t('inlineSwitcher.modelDefault')
+      ? currentModelLabel && currentModelId !== 'default'
+        ? currentModelLabel
+        : t('inlineSwitcher.modelDefault')
       : config.model.trim() || t('inlineSwitcher.modelDefault');
 
   const chipUnlimitedBadge = unlimitedBadgeForModel(currentModelId);
@@ -1245,7 +1141,6 @@ export function InlineModelSwitcher({
                 className={
                   'inline-switcher__campaign-badge'
                   + (chipUnlimitedBadge.tooltip ? ' od-tooltip' : '')
-                  + chipUnlimitedBadge.stateClass
                 }
                 data-tooltip={chipUnlimitedBadge.tooltip ?? undefined}
                 data-tooltip-placement={chipUnlimitedBadge.tooltip ? 'top' : undefined}
@@ -1497,7 +1392,7 @@ export function InlineModelSwitcher({
                             // the settings picker's lock) instead of writing a
                             // choice the config would revert.
                             if (!applyAgentModel(m.id)) {
-                              if (amrCanUpgrade || campaignNeedsUpgrade) {
+                              if (amrCanUpgrade) {
                                 openAmrModelUpgrade();
                               }
                               return;
@@ -1538,7 +1433,6 @@ export function InlineModelSwitcher({
                               className={
                                 'inline-switcher__campaign-badge'
                                 + (unlimitedBadge.tooltip ? ' od-tooltip' : '')
-                                + unlimitedBadge.stateClass
                               }
                               data-tooltip={unlimitedBadge.tooltip ?? undefined}
                               data-tooltip-placement={unlimitedBadge.tooltip ? 'top' : undefined}

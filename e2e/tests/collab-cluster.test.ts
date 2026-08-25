@@ -114,17 +114,6 @@ describe('createCollabCluster acquisition cleanup', () => {
     expect(secondSpec.root).toContain(runtimeMocks.workspaceRoot);
     expect(firstSpec.dataDir).toBe(join(firstSpec.root, 'scratch', 'data'));
     expect(secondSpec.dataDir).toBe(join(secondSpec.root, 'scratch', 'data'));
-    // Isolated cluster contexts never pass through the suite fixture, so
-    // campaign dismissal must be seeded on each newContext result — and
-    // before newPage, so the init script is installed for the first load.
-    expect(firstContext.addInitScript).toHaveBeenCalledTimes(1);
-    expect(secondContext.addInitScript).toHaveBeenCalledTimes(1);
-    expect(firstContext.addInitScript.mock.invocationCallOrder[0]).toBeLessThan(
-      firstContext.newPage.mock.invocationCallOrder[0]!,
-    );
-    expect(secondContext.addInitScript.mock.invocationCallOrder[0]).toBeLessThan(
-      secondContext.newPage.mock.invocationCallOrder[0]!,
-    );
 
     await cluster.close();
     await cluster.close();

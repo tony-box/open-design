@@ -1,12 +1,11 @@
-/* Subscription-invitation styling for the pre-run balance gate. Centered
- * card, warm accent halo, benefit stagger — an unlock moment, not an error.
+/* Styling for the pre-run balance gate. Centered card, warm accent halo.
  * The shared Dialog chrome supplies the backdrop, elevation, and the
  * 220ms pop-in (scale 0.97 + opacity, custom cubic-bezier). */
 
 /* 480px, not 400: the insufficient-balance line carries an inline amount, so it
  * always wraps — the narrower panel broke it mid-phrase ("升级套 / 餐"). The
- * extra width gives the wrap a clean phrase boundary and lets the benefits card
- * and the side-by-side action row breathe. */
+ * extra width gives the wrap a clean phrase boundary and lets the
+ * side-by-side action row breathe. */
 .panel {
   position: relative;
   width: min(480px, calc(100vw - 32px));
@@ -15,21 +14,6 @@
   padding: 36px 24px 24px;
   gap: 0;
   overflow: hidden;
-}
-
-/* Bleeds to the panel's edges (negative margin cancels .panel's own padding)
- * so the artwork reaches the dialog's rounded corners; .panel's overflow:
- * hidden clips it to match instead of duplicating the radius here. */
-.banner {
-  margin: -36px -24px 24px;
-}
-
-/* No object-fit crop — width:100% + height:auto keeps the source's native
- * aspect ratio intact rather than cropping it to fit a fixed box. */
-.bannerImage {
-  display: block;
-  width: 100%;
-  height: auto;
 }
 
 .closeButton {
@@ -74,77 +58,6 @@
   color: var(--text-muted);
   text-wrap: balance;
   font-variant-numeric: tabular-nums;
-}
-
-.benefitsCard {
-  width: 100%;
-  margin: 0 0 18px;
-  padding: 12px 16px;
-  text-align: start;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius);
-  background: var(--bg-panel);
-}
-
-/* Eyebrow label naming whose advantages the list below sells. Accent, not
- * gray: the brand attribution is the label's whole job, and it ties the card
- * to the check icons and CTA without competing with the main title. */
-.benefitsTitle {
-  display: block;
-  margin-bottom: 10px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--accent);
-}
-
-.benefits {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.benefit {
-  display: grid;
-  /* Fixed icon column so wrapped labels stay aligned to the text, not the
-   * icon — matches the row rhythm of the artifact-upgrade gate's benefit list. */
-  grid-template-columns: 22px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  font-size: 13.5px;
-  line-height: 1.45;
-  color: var(--text);
-  /* Rare dialog → a light cascade adds delight without slowing anyone down. */
-  opacity: 0;
-  transform: translateY(4px);
-  animation: amr-gate-benefit-in 240ms cubic-bezier(0.23, 1, 0.32, 1) forwards;
-}
-
-.benefit:nth-child(1) { animation-delay: 60ms; }
-.benefit:nth-child(2) { animation-delay: 100ms; }
-.benefit:nth-child(3) { animation-delay: 140ms; }
-.benefit:nth-child(4) { animation-delay: 180ms; }
-
-@keyframes amr-gate-benefit-in {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.benefitIcon {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  flex: none;
-  /* Full radius: a circular tick chip, matching the pill action row below. */
-  border-radius: var(--radius-pill, 999px);
-  color: var(--accent);
-  background: var(--accent-tint);
 }
 
 /* Side-by-side pair: dismissal on the left, the upgrade CTA on the right,
@@ -244,12 +157,4 @@
   margin: 12px 0 0;
   font-size: 11.5px;
   color: var(--text-muted);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .benefit {
-    animation: none;
-    opacity: 1;
-    transform: none;
-  }
 }

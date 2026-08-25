@@ -99,23 +99,6 @@
   user-select: none;
   -webkit-user-drag: none;
 }
-/* Tile-field wordmark: a sized, relative host the canvas engine measures and
-   overlays. Keeps the original logo's footprint (same 1705:291 aspect as
-   logo-03.svg) so the composer below doesn't shift. */
-.home-hero__logo--tiles {
-  position: relative;
-  aspect-ratio: 1705 / 291;
-}
-.home-hero__logo--tiles > canvas {
-  position: absolute;
-  inset: 0;
-  /* Canvas is a replaced element: inset alone does NOT stretch it (it keeps
-     its intrinsic drawing-buffer size), so pin the CSS box explicitly. */
-  width: 100%;
-  height: 100%;
-  display: block;
-  pointer-events: none;
-}
 .home-hero__title {
   /* Extra bottom margin widens just the title → input-card gap (adds to the
      6px flex gap → ~26px total) without touching the logo → title spacing. */

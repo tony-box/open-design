@@ -406,7 +406,6 @@
 .entry-rail-actions > * {
   align-self: center;
 }
-.entry-rail-actions .entry-star-badge,
 .entry-rail-actions .entry-discord-badge,
 .entry-rail-actions .entry-mail-badge,
 .entry-rail-actions .use-everywhere-chip {
@@ -1163,10 +1162,9 @@
   scrollbar-gutter: stable;
 }
 
-/* Floating top-right cluster (portaled to document.body): campaign badge on
+/* Floating top-right cluster (portaled to document.body): GitHub chip on
    the left, account module on the right, one flex row. Owns the fixed
-   position + z-index that used to live on the badge itself. Must clear
-   .workspace-tabs-chrome (z-index: 120).
+   position + z-index. Must clear .workspace-tabs-chrome (z-index: 120).
 
    `top` vertically centers the cluster's 26px pills in the 44px tabs-chrome
    row — (44 − 26) / 2 = 9 — so their centerline matches the pinned Home
@@ -1191,65 +1189,11 @@
   -webkit-app-region: no-drag;
 }
 
-.entry-deepseek-campaign-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 26px;
-  padding: 4px 11px 4px 13px;
-  border: 1px solid color-mix(in srgb, var(--brand) 42%, var(--border));
-  border-radius: var(--radius-pill);
-  color: var(--brand-text);
-  background: color-mix(in srgb, var(--brand-soft) 82%, var(--bg-panel));
-  box-shadow: var(--shadow-xs);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  font-size: 12px;
-  font-weight: 700;
-  font-family: inherit;
-  line-height: 1;
-  text-decoration: none;
-  cursor: pointer;
-  pointer-events: auto;
-  -webkit-app-region: no-drag;
-  transition:
-    border-color 140ms cubic-bezier(0.23, 1, 0.32, 1),
-    background 140ms cubic-bezier(0.23, 1, 0.32, 1),
-    transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-.entry-deepseek-campaign-badge::before {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 auto;
-  border-radius: var(--radius-circular);
-  background: var(--brand-text);
-  content: '';
-}
-
-.entry-deepseek-campaign-badge svg {
-  color: var(--brand-text);
-}
-
-.entry-deepseek-campaign-badge:hover {
-  border-color: color-mix(in srgb, var(--brand) 70%, var(--border));
-  background: var(--brand-soft);
-  transform: translateY(-1px);
-}
-
-.entry-deepseek-campaign-badge:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
 @media (max-width: 760px) {
   /* Tighter right inset only — the vertical centering against the 44px
      chrome row is the same at every width. */
   .entry-top-right-cluster {
     right: 12px;
-  }
-  .entry-deepseek-campaign-badge {
-    max-width: calc(100vw - 88px);
   }
 }
 /* Frosted top edge: content scrolling up toward the (transparent) tab strip
@@ -2104,6 +2048,8 @@
   text-align: left;
 }
 
+/* Entitlement badge on a model row — marks models the plan includes without
+   metering. */
 .inline-switcher__campaign-badge {
   flex: 0 0 auto;
   padding: 2px 6px;
@@ -2115,25 +2061,6 @@
   line-height: 1.4;
   cursor: help;
   outline: none;
-}
-.inline-switcher__campaign-badge.is-restricted {
-  color: #5f645d;
-  background: #e4e7e2;
-}
-.inline-switcher__campaign-badge.is-unpaid {
-  color: #5f645d;
-  background: #eceeeb;
-}
-.inline-switcher__chip[data-campaign-highlight='true'] {
-  border-color: var(--accent);
-  animation: deepseek-campaign-chip-pulse 760ms cubic-bezier(0.23, 1, 0.32, 1) 2;
-}
-@keyframes deepseek-campaign-chip-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
-  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 22%, transparent); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .inline-switcher__chip[data-campaign-highlight='true'] { animation: none; }
 }
 .inline-switcher__agent-status {
   display: inline-flex;
@@ -5028,37 +4955,6 @@
 
 
 
-/* ============================================================
-   GitHub star pill — sticky top-bar CTA.
-
-   Mirrors the marketing landing-page "Star · <count>" affordance:
-   small chrome, low-emphasis, sits next to the model switcher and
-   settings cog. Hover swaps to the panel-strong palette so the call-
-   to-action still reads as clickable when the topbar is otherwise
-   sparse. The count slot animates in via `data-loading` so the
-   pill never visibly jumps when the API response arrives.
-   ============================================================ */
-.entry-star-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--bg-panel);
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1;
-  text-decoration: none;
-  cursor: pointer;
-  box-shadow: var(--shadow-xs);
-  transition: background-color 120ms var(--ease-out), border-color 120ms var(--ease-out),
-    color 120ms var(--ease-out), transform 120ms var(--ease-out);
-  white-space: nowrap;
-}
-.entry-rail-actions .entry-star-badge,
 .entry-rail-actions .entry-discord-badge,
 .entry-rail-actions .entry-x-badge,
 .entry-rail-actions .entry-mail-badge,
@@ -5068,12 +4964,6 @@
   border-radius: 8px;
   background: transparent;
   box-shadow: none;
-}
-.entry-rail-actions .entry-star-badge {
-  flex: 1 1 0;
-  min-width: 0;
-  justify-content: flex-start;
-  padding: 0 9px;
 }
 .entry-rail-actions .entry-discord-badge,
 .entry-rail-actions .entry-x-badge,
@@ -5087,8 +4977,6 @@
 .entry-rail-actions .entry-discord-badge__online,
 .entry-rail-actions .entry-x-badge__label,
 .entry-rail-actions .entry-mail-badge__label,
-.entry-rail-actions .entry-star-badge__label,
-.entry-rail-actions .entry-star-badge__sep,
 .entry-rail-actions .entry-help-menu__label {
   display: none;
 }
@@ -5097,55 +4985,12 @@
 .entry-rail-actions .entry-mail-badge__icon {
   margin: 0;
 }
-.entry-rail-actions .entry-star-badge:hover,
 .entry-rail-actions .entry-discord-badge:hover,
 .entry-rail-actions .entry-x-badge:hover,
 .entry-rail-actions .entry-mail-badge:hover,
 .entry-rail-actions .use-everywhere-chip:hover {
   border-color: transparent;
   background: color-mix(in srgb, var(--text) 5%, transparent);
-}
-
-.entry-rail-actions .entry-star-badge__label,
-.entry-rail-actions .entry-star-badge__count {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.entry-star-badge:hover {
-  background: var(--bg-subtle);
-  border-color: var(--border-strong);
-  color: var(--text-strong);
-}
-.entry-star-badge:active {
-  transform: scale(0.98);
-}
-.entry-star-badge:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-.entry-star-badge__icon {
-  color: var(--text-strong);
-  flex: 0 0 auto;
-}
-.entry-star-badge:hover .entry-star-badge__icon {
-  color: var(--text-strong);
-}
-.entry-star-badge__label {
-  color: var(--text-strong);
-  font-weight: 600;
-}
-.entry-star-badge__sep {
-  color: var(--text-faint);
-}
-.entry-star-badge__count {
-  display: inline-block;
-  min-width: 5ch;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-  transition: opacity 160ms var(--ease-out);
-}
-.entry-star-badge__count[data-loading='true'] {
-  opacity: 0.55;
 }
 
 .entry-discord-badge {
@@ -5279,12 +5124,6 @@
 }
 
 @media (max-width: 700px) {
-  .entry-star-badge__label {
-    display: none;
-  }
-  .entry-star-badge__sep {
-    display: none;
-  }
   .entry-discord-badge {
     padding: 0 9px;
   }
@@ -6070,15 +5909,16 @@
    比头像高出一圈). */
 /* Credits and the avatar read as two separate controls (per product): the
    wrapper is a bare flex row — each child paints its own surface. */
-/* Standalone GitHub star chip in the top-right cluster, sitting between the
-   campaign badge and the account capsule. Same pill material as the capsule
-   so the three read as one row of chips. */
+/* Icon-only GitHub link in the top-right cluster, sitting before the account
+   capsule. Same pill material as the capsule so they read as one row of
+   chips; square footprint + pill radius makes it a circular icon target. */
 .entry-top-right-github {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
+  width: 30px;
   min-height: 30px;
-  padding: 0 11px;
+  padding: 0;
   border: 1px solid var(--material-separator);
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--bg-elevated) 86%, transparent);
@@ -6086,17 +5926,16 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   color: var(--text-strong);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
   text-decoration: none;
-  white-space: nowrap;
 }
 .entry-top-right-github svg {
   color: var(--text-soft);
 }
 .entry-top-right-github:hover {
   border-color: var(--border-strong);
+}
+.entry-top-right-github:hover svg {
+  color: var(--text-strong);
 }
 
 .entry-top-right-account-pill {

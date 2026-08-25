@@ -8,13 +8,8 @@ const homeHeroSource = read('../../src/components/HomeHero.tsx');
 const entryNavRailSource = read('../../src/components/EntryNavRail.tsx');
 const logoSvg = read('../../public/logo.svg');
 const brandIconSvg = read('../../public/brand-icon.svg');
-// #5517: the home hero header shows the full OpenDesign logotype instead of
-// the small glyph + name pair; the asset must ship with the app.
-const heroLogotypeSvg = read('../../public/logo-03.svg');
-// Round 7: the static logotype is now driven by the WebGL pixel-scan wordmark
-// (see home-hero/pixel-scan/engine.ts), which samples this SVG's alpha
-// channel as the glyph mask it assembles out of coloured blocks.
-const heroPixelScanSvg = read('../../public/logo-scan.svg');
+// The hero renders this logotype as a plain static image.
+const heroLogotypeAsset = read('../../public/logo-scan.svg');
 
 // The current OpenDesign brand glyph is the ink superellipse tile introduced
 // with the landing-page rebrand (landing PR #3444): its outline starts with
@@ -39,14 +34,9 @@ describe('Home logo assets', () => {
   });
 
   it('renders the brand mark on the Home hero', () => {
-    // #5517: the hero renders the shipped logotype image (not the glyph pair).
-    expect(heroLogotypeSvg).toContain('<svg');
-    // Round 7: the hero mounts the animated PixelScanLogo component instead of
-    // a plain <img>; the logotype now ships as the pixel-scan engine's sample
-    // source (logo-scan.svg) rather than an inline `src="/logo-03.svg"`.
-    expect(heroPixelScanSvg).toContain('<svg');
-    expect(homeHeroSource).toContain('<PixelScanLogo');
-    expect(homeHeroSource).not.toContain('src="/logo-03.svg"');
+    // The hero ships the logotype as a static <img>, with no animated engine.
+    expect(heroLogotypeAsset).toContain('<svg');
+    expect(homeHeroSource).toContain('src="/logo-scan.svg"');
     expect(homeHeroSource).not.toContain('src="/app-icon.svg"');
 
     // #6156 cut the rail's signed-out brand header entirely — with no cloud

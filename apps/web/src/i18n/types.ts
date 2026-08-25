@@ -277,9 +277,6 @@ export interface Dict {
   'settings.onboardingStepConnect': string;
   'settings.onboardingStepDesignSystem': string;
   'settings.onboardingStepProfile': string;
-  'settings.onboardingStepNewsletter': string;
-  'settings.onboardingNewsletterTitle': string;
-  'settings.onboardingNewsletterBody': string;
   'settings.onboardingConnectTitle': string;
   'settings.onboardingConnectBody': string;
   'settings.onboardingCloudTitle': string;
@@ -441,7 +438,6 @@ export interface Dict {
   'settings.amrBenefitOfficial': string;
   'settings.amrBenefitLowerPrice': string;
   'settings.amrBenefitManyModels': string;
-  'settings.amrPromoBonus': string;
   'settings.amrSignInToContinue': string;
   'settings.amrSignIn': string;
   'settings.amrSignedIn': string;
@@ -1111,8 +1107,6 @@ export interface Dict {
   'whatsNew.cta': string;
 
   // Newsletter email field on the onboarding About-you step.
-  'newsletter.label': string;
-  'newsletter.placeholder': string;
 
   // Entry view / tabs
   'entry.tabDesigns': string;
@@ -2231,9 +2225,6 @@ export interface Dict {
   'entry.helpWhatsNew': string;
   'entry.helpDownloadDesktop': string;
   // GitHub star pill in the top bar
-  'entry.githubStarLabel': string;
-  'entry.githubStarTitle': string;
-  'entry.githubStarAria': string;
 
   // Connectors tab
   'connectors.title': string;
@@ -2859,11 +2850,6 @@ export interface Dict {
   'chat.amrError.rechargeCta': string;
   'chat.amrBalanceGate.title': string;
   'chat.amrBalanceGate.message': string;
-  'chat.amrBalanceGate.benefitsTitle': string;
-  'chat.amrBalanceGate.benefit1': string;
-  'chat.amrBalanceGate.benefit2': string;
-  'chat.amrBalanceGate.benefit3': string;
-  'chat.amrBalanceGate.benefit4': string;
   'chat.amrBalanceGate.laterCta': string;
   'chat.amrBalanceGate.plansCta': string;
   'chat.amrBalanceGate.signedOutTitle': string;
@@ -2875,20 +2861,6 @@ export interface Dict {
   'chat.amrLowBalance.rechargeCta': string;
   'chat.amrLowBalance.proceedCta': string;
   'chat.amrLowBalance.dontRemind': string;
-  'chat.amrArtifactUpgrade.title': string;
-  'chat.amrArtifactUpgrade.message': string;
-  'chat.amrArtifactUpgrade.benefit1': string;
-  'chat.amrArtifactUpgrade.benefit2': string;
-  'chat.amrArtifactUpgrade.benefit3': string;
-  'chat.amrArtifactUpgrade.benefit4': string;
-  'chat.amrArtifactUpgrade.promoBanner': string;
-  'chat.amrArtifactUpgrade.countdownLabel': string;
-  'chat.amrArtifactUpgrade.plansCta': string;
-  'chat.amrArtifactUpgrade.homePlansCta': string;
-  'chat.amrArtifactUpgrade.laterCta': string;
-  'chat.amrArtifactUpgrade.homeTitle': string;
-  'chat.amrArtifactUpgrade.homeMessage': string;
-  'chat.amrArtifactUpgrade.homeArtifactCta': string;
   'chat.antigravityError.launchTerminalCta': string;
   'chat.antigravityError.launchSwitchModelCta': string;
   'chat.connectionDropped': string;
@@ -5413,34 +5385,6 @@ export interface Dict {
   'skillDetail.loadFailed': string;
   'skillDetail.previewAria': string;
   'common.dismiss': string;
-  'campaign.deepseekV4Flash.headline': string;
-  'campaign.deepseekV4Flash.description': string;
-  'campaign.deepseekV4Flash.benefit': string;
-  'campaign.deepseekV4Flash.timing': string;
-  'campaign.deepseekV4Flash.ruleSummary': string;
-  'campaign.deepseekV4Flash.windowLabel': string;
-  'campaign.deepseekV4Flash.weekFreeSuffix': string;
-  'campaign.deepseekV4Flash.boundary': string;
-  'campaign.deepseekV4Flash.countdownLabel': string;
-  'campaign.deepseekV4Flash.countdownEnded': string;
-  'campaign.deepseekV4Flash.countdownRemaining': string;
-  'campaign.deepseekV4Flash.closeAria': string;
-  'campaign.deepseekV4Flash.unlocked': string;
-  'campaign.deepseekV4Flash.locked': string;
-  'campaign.deepseekV4Flash.later': string;
-  'campaign.deepseekV4Flash.paid.eyebrow': string;
-  'campaign.deepseekV4Flash.paid.status': string;
-  'campaign.deepseekV4Flash.paid.cta': string;
-  'campaign.deepseekV4Flash.paid.modelBadge': string;
-  'campaign.deepseekV4Flash.unpaid.eyebrow': string;
-  'campaign.deepseekV4Flash.unpaid.status': string;
-  'campaign.deepseekV4Flash.unpaid.cta': string;
-  'campaign.deepseekV4Flash.unpaid.modelBadge': string;
-  'campaign.deepseekV4Flash.unpaid.tooltip': string;
-  'campaign.deepseekV4Flash.restricted.modelBadge': string;
-  'campaign.deepseekV4Flash.restricted.tooltip': string;
-  'campaign.deepseekV4Flash.workbenchBadge': string;
-  'campaign.deepseekV4Flash.workbenchBadgeAria': string;
 
   'experienceSurvey.tag': string;
   'experienceSurvey.close': string;

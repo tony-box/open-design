@@ -127,14 +127,12 @@ function renderSwitcher(config: Partial<AppConfig> = {}) {
   );
 }
 
-/** Pins the clock outside the DeepSeek campaign window so the badge under test
- *  can only come from the subscription itself. */
+/** Pins the clock so the badge under test can only come from the subscription. */
 function mockNow(at: string): void {
   vi.spyOn(Date, 'now').mockReturnValue(Date.parse(at));
 }
 
 const AFTER_CAMPAIGN = '2026-09-01T12:00:00+08:00';
-const DURING_CAMPAIGN = '2026-08-20T12:00:00+08:00';
 
 function badgedModelIds(): string[] {
   fireEvent.click(screen.getByTestId('inline-model-switcher-chip'));
@@ -210,20 +208,11 @@ describe('unlimited badge follows the subscription tier', () => {
     },
   );
 
-  it('badges nothing for a free plan once the campaign window has closed', () => {
+  it('badges nothing for a free plan', () => {
     mockNow(AFTER_CAMPAIGN);
     setPlan(null);
     renderSwitcher();
     expect(badgedModelIds()).toEqual([]);
-  });
-
-  it('keeps the campaign badge for a free plan while the window is open', () => {
-    mockNow(DURING_CAMPAIGN);
-    setPlan(null);
-    renderSwitcher();
-    expect(badgedModelIds().sort()).toEqual(
-      ['deepseek-v4-flash', 'deepseek-v4-pro'].sort(),
-    );
   });
 
   it('marks the selected model on the chip itself', () => {

@@ -51,7 +51,6 @@ import { resetCloudSignInTipDismissal } from './CloudSignInTip';
 import { SignOutConfirmDialog } from './SignOutConfirmDialog';
 import { notifyAmrLoginStatusChanged } from './amrLoginPolling';
 import { Icon } from './Icon';
-import { GITHUB_STARS_FALLBACK_LABEL, formatStars, useGithubStars } from './useGithubStars';
 import { PlanWordmark, planBadgeTierForWorkspace } from './PlanWordmark';
 import { RemixIcon } from './RemixIcon';
 import { InviteDialog } from './InviteDialog';
@@ -75,10 +74,6 @@ import { canUpgradeFromPlanTier, resolvePlanLabelTier } from '../collab/team-pla
 import { shouldShowCreditsBalance } from './entry-rail-account-state';
 import { amrPlansUrlForProfile } from '../runtime/amr-guidance';
 import { useWorkspaceInvalidation } from '../collab/workspace-events';
-import { resolveDeepSeekV4FlashCampaignAudience } from '../campaigns/deepseek-v4-flash';
-import { useDeepSeekV4FlashCampaignVisibility } from '../campaigns/use-deepseek-v4-flash-campaign';
-import { resolveSubscriptionAudience } from '../campaigns/go-plan';
-import { useGoPlanCampaignVisibility } from '../campaigns/use-go-plan-campaign';
 import type { EntryHomeView } from '../router';
 import type {
   AccountMenuClickProps,
@@ -97,9 +92,8 @@ import {
   stableAnalyticsErrorCode,
   workspaceAnalyticsDimensions,
 } from '../analytics/workspace';
-import { WorkbenchCampaignBadge } from './WorkbenchCampaignBadge';
 
-const REPO_URL = 'https://github.com/nexu-io/open-design';
+const REPO_URL = 'https://github.com/tony-box/open-design';
 const GITHUB_HELP_URL = `${REPO_URL}/issues/new`;
 const GITHUB_FEATURE_URL = `${REPO_URL}/pulls`;
 const DISCORD_URL = 'https://discord.gg/mHAjSMV6gz';
@@ -211,9 +205,6 @@ interface Props {
   newProjectDisabled?: boolean;
   /** When false the rail is collapsed (hidden off-canvas) on the entry view. */
   open: boolean;
-  /** Extra content for the floating top-right cluster, rendered LEFT of the
-   *  account module (e.g. the DeepSeek campaign badge). */
-  topRightSlot?: ReactNode;
   /** The one shared workspace context; null → local (no cloud identity) state. */
   context: WorkspaceCollabContext | null;
   /** Account billing metadata (via the vela CLI 收口). Null → the billing
@@ -528,9 +519,6 @@ interface EntryTopRightClusterProps {
   context: WorkspaceCollabContext | null;
   billing?: WorkspaceBillingSummary | null;
   balanceUsd?: string | null;
-  /** Extra content rendered LEFT of the credits pill (e.g. the DeepSeek
-   *  campaign badge on Home). */
-  leadingSlot?: ReactNode;
   /** Update-ready host; rides the account row right after the avatar chip. */
   updaterSlot?: ReactNode;
   onOpenSettings?: (section?: EntrySettingsSection) => void;
@@ -538,9 +526,9 @@ interface EntryTopRightClusterProps {
 }
 
 /**
- * Top-right floating cluster (portaled to document.body): an optional leading
- * slot, the standalone credits pill, and the avatar account module with its
- * hover menu — one flex row riding the workbench top-right corner.
+ * Top-right floating cluster (portaled to document.body): the standalone
+ * credits pill and the avatar account module with its hover menu — one flex
+ * row riding the workbench top-right corner.
  *
  * Extracted from `EntryNavRail` so the WORKSPACE view (an open project tab)
  * can mount the same avatar + credits in the same fixed position even though
@@ -555,7 +543,6 @@ export function EntryTopRightCluster({
   context,
   billing,
   balanceUsd,
-  leadingSlot,
   updaterSlot,
   onOpenSettings,
   onSignedOut,
@@ -632,7 +619,6 @@ export function EntryTopRightCluster({
   // Sign-out confirm gate (recvqgMWpJZqhL): the menu item only ARMS the
   // confirmation dialog; the real logout chain runs on explicit confirm.
   const [confirmSignOut, setConfirmSignOut] = useState(false);
-  const githubStars = useGithubStars();
   // Signed-in account email for the menu head (#5517 shows it under the
   // display name). The workspace context carries no email, so lazily read the
   // vela login-status projection the first time the menu opens — never on
@@ -750,27 +736,23 @@ export function EntryTopRightCluster({
     });
   }
 
-  if ((!leadingSlot && !context) || typeof document === 'undefined') return null;
+  if (!context || typeof document === 'undefined') return null;
 
   return (
     <>
       {createPortal(
         <div className="entry-top-right-cluster">
-          {leadingSlot}
-          {/* GitHub star chip: its own option in the cluster, right after the
-              campaign badge (per product) — it used to live in the account
-              menu's social row. */}
+          {/* Icon-only link to the source repository. */}
           <a
             className="entry-top-right-github"
             href={REPO_URL}
             {...externalLinkProps}
-            aria-label={`GitHub · ${githubStars == null ? GITHUB_STARS_FALLBACK_LABEL : formatStars(githubStars)} stars`}
-            title={`GitHub · ${githubStars == null ? GITHUB_STARS_FALLBACK_LABEL : formatStars(githubStars)} stars`}
+            aria-label="GitHub"
+            title="GitHub"
             data-testid="entry-top-right-github"
             onClick={() => trackAccountAction('github')}
           >
-            <Icon name="github-filled" size={14} />
-            <span>{githubStars == null ? GITHUB_STARS_FALLBACK_LABEL : formatStars(githubStars)}</span>
+            <Icon name="github-filled" size={16} />
           </a>
           {/* One shared capsule for the account module (per product: 头像和积分
               合并成一个胶囊): credits segment on the left (same availability
@@ -1041,10 +1023,6 @@ export function WorkspaceTopRightAccountCluster({
   updaterSlot,
   workspaceContextOverride,
   workspaceContextLoading,
-  amrLoggedIn = null,
-  amrAccountPlan = null,
-  metricsConsent = false,
-  installationId,
 }: {
   onOpenSettings?: (section?: EntrySettingsSection) => void;
   onSignedOut?: () => void | Promise<void>;
@@ -1052,10 +1030,6 @@ export function WorkspaceTopRightAccountCluster({
   updaterSlot?: ReactNode;
   workspaceContextOverride?: WorkspaceCollabContext | null;
   workspaceContextLoading?: boolean;
-  amrLoggedIn?: boolean | null;
-  amrAccountPlan?: string | null;
-  metricsConsent?: boolean;
-  installationId?: string | null;
 }) {
   const ambient = useWorkspaceContext();
   const hasExplicitWorkspaceContext = workspaceContextOverride !== undefined;
@@ -1074,47 +1048,12 @@ export function WorkspaceTopRightAccountCluster({
   // ACCOUNT read (`workspaceId: null` by contract). Same rule as EntryShell.
   const billing = workspaceBillingSummaryForContext(billingResponse, context);
   const balanceUsd = workspaceBillingBalanceUsd(billingResponse, context);
-  const deepSeekCampaignVisibility = useDeepSeekV4FlashCampaignVisibility();
-  const goPlanCampaignVisibility = useGoPlanCampaignVisibility();
-  const campaignPlan = resolvePlanLabelTier({
-    billing,
-    context,
-    accountPlan:
-      contextLoading || context?.workspaceType === 'team'
-        ? null
-        : amrAccountPlan,
-  });
-  const deepSeekCampaignAudience = resolveDeepSeekV4FlashCampaignAudience({
-    plan: campaignPlan,
-    loggedIn: amrLoggedIn,
-    now: deepSeekCampaignVisibility.now,
-  });
-  const subscriptionAudience = resolveSubscriptionAudience({
-    plan: campaignPlan,
-    loggedIn: amrLoggedIn,
-  });
-  const campaignKind =
-    subscriptionAudience === 'unpaid'
-      ? goPlanCampaignVisibility.visible
-        ? 'go'
-        : null
-      : deepSeekCampaignAudience === 'paid'
-        ? 'deepseek'
-        : null;
   return (
     <EntryTopRightCluster
       page="project"
       context={context}
       billing={billing}
       balanceUsd={balanceUsd}
-      leadingSlot={campaignKind ? (
-        <WorkbenchCampaignBadge
-          kind={campaignKind}
-          page="project"
-          metricsConsent={metricsConsent}
-          installationId={installationId}
-        />
-      ) : null}
       updaterSlot={updaterSlot}
       onOpenSettings={onOpenSettings}
       onSignedOut={onSignedOut}
@@ -1194,7 +1133,6 @@ export function EntryNavRail({
   onOpenSearch,
   newProjectDisabled,
   open,
-  topRightSlot,
   context,
   billing,
   balanceUsd,
@@ -1881,7 +1819,6 @@ export function EntryNavRail({
         context={context}
         billing={billing}
         balanceUsd={balanceUsd}
-        leadingSlot={topRightSlot}
         updaterSlot={updaterSlot}
         onOpenSettings={onOpenSettings}
         onSignedOut={onSignedOut}

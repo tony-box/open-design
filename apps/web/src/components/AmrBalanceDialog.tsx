@@ -67,11 +67,9 @@ interface Props {
 // fires `onResolved` once the recharge lands — so the parked task continues
 // without the user having to re-send it.
 //
-// Both variants keep the benefits list (they sell the service to exactly the
-// not-yet-committed cohort). The caller preserves the payload (home keeps
-// the composer draft; chat parks the full send in the queue). The softer
-// low-balance reminder lives in AmrLowBalanceDialog; this hard tier is never
-// subject to its opt-out.
+// The caller preserves the payload (home keeps the composer draft; chat parks
+// the full send in the queue). The softer low-balance reminder lives in
+// AmrLowBalanceDialog; this hard tier is never subject to its opt-out.
 export function AmrBalanceDialog({
   reason,
   balanceUsd,
@@ -158,12 +156,6 @@ export function AmrBalanceDialog({
       'noopener,noreferrer',
     );
   };
-  const benefits = [
-    t('chat.amrBalanceGate.benefit1'),
-    t('chat.amrBalanceGate.benefit2'),
-    t('chat.amrBalanceGate.benefit3'),
-    t('chat.amrBalanceGate.benefit4'),
-  ];
   const dialog = (
     <Dialog
       role="alertdialog"
@@ -181,17 +173,6 @@ export function AmrBalanceDialog({
       >
         <Icon name="close" size={14} />
       </button>
-      <div className={styles.banner}>
-        <img
-          className={styles.bannerImage}
-          src="/upgrade/cloud-signin-aurora.jpg"
-          alt=""
-          width={1680}
-          height={720}
-          decoding="async"
-          draggable={false}
-        />
-      </div>
       <h2 className={styles.title}>
         {signedOut ? t('chat.amrBalanceGate.signedOutTitle') : t('chat.amrBalanceGate.title')}
       </h2>
@@ -203,21 +184,6 @@ export function AmrBalanceDialog({
             // suspenders for a malformed snapshot.
             t('chat.amrBalanceGate.message', { balance: formattedBalance ?? '$0.00' })}
       </p>
-      <div className={styles.benefitsCard}>
-        <span className={styles.benefitsTitle}>
-          {t('chat.amrBalanceGate.benefitsTitle')}
-        </span>
-        <ul className={styles.benefits}>
-          {benefits.map((benefit) => (
-            <li key={benefit} className={styles.benefit}>
-              <span className={styles.benefitIcon} aria-hidden>
-                <Icon name="check" size={14} />
-              </span>
-              {benefit}
-            </li>
-          ))}
-        </ul>
-      </div>
       {/* Dismissal first in DOM so it lands on the left of the row and focus
           order matches the reading order; the CTA follows on the right. */}
       <div className={styles.actions}>

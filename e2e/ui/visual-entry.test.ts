@@ -99,53 +99,6 @@ test('[P2] captures the visual home harness', async ({ page }) => {
   await captureVisual(page, 'visual-home');
 });
 
-test('[P2] captures the Go campaign at narrow and short viewport boundaries', async ({ page }) => {
-  test.setTimeout(T.xlong);
-
-  await page.clock.setFixedTime('2026-08-21T00:00:00+08:00');
-  await page.setViewportSize({ width: 600, height: 720 });
-  await configureVisualPage(page, { projects: [] });
-  await mockSignedInVelaAccount(page, { plan: 'free' });
-  await gotoVisualHome(page);
-  // Functional specs seed campaign dismissals globally so marketing surfaces
-  // cannot interrupt unrelated flows. This visual contract deliberately opts
-  // back into the Go modal after establishing the page's same-origin storage.
-  await page.evaluate(() => {
-    window.localStorage.removeItem('open-design:campaign-seen:go-plan-launch-2026');
-  });
-  await ensureRailOpen(page);
-  await page.getByTestId('entry-nav-community').evaluate((element: HTMLButtonElement) => {
-    element.click();
-  });
-  await expect(page.getByTestId('entry-view-home')).toHaveAttribute('data-active', 'false');
-  await page.getByTestId('entry-nav-home').evaluate((element: HTMLButtonElement) => {
-    element.click();
-  });
-
-  const dialog = page.getByTestId('deepseek-v4-flash-campaign-dialog');
-  const close = page.getByRole('button', { name: 'Close dialog' });
-  const cta = page.getByRole('button', { name: 'View Go plan' });
-  await expect(dialog).toBeVisible();
-  await expect(close).toBeVisible();
-  await expect(cta).toBeVisible();
-  await expectInsideViewport(page, dialog);
-  await expectInsideViewport(page, close);
-  await expectInsideViewport(page, cta);
-  await captureVisual(page, 'visual-go-campaign-600');
-
-  await page.setViewportSize({ width: 760, height: 400 });
-  await expect(close).toBeVisible();
-  await expectInsideViewport(page, dialog);
-  await expectInsideViewport(page, close);
-  await expect.poll(async () => dialog.evaluate((element) => (
-    element.scrollHeight > element.clientHeight
-  ))).toBe(true);
-  await captureVisual(page, 'visual-go-campaign-short-height');
-  await cta.scrollIntoViewIfNeeded();
-  await expect(cta).toBeVisible();
-  await expectInsideViewport(page, cta);
-});
-
 test('[P2] captures the home plugin catalog surface', async ({ page }) => {
   test.setTimeout(90_000);
 
@@ -317,25 +270,4 @@ async function openVisualPluginsCatalog(page: import('@playwright/test').Page) {
 
 function pluginMarketplaceCard(root: import('@playwright/test').Locator, title: string) {
   return root.locator('article.plugin-marketplace__item').filter({ hasText: title }).first();
-}
-
-async function expectInsideViewport(
-  page: import('@playwright/test').Page,
-  locator: import('@playwright/test').Locator,
-): Promise<void> {
-  const viewport = page.viewportSize();
-  expect(viewport).not.toBeNull();
-  await expect.poll(async () => {
-    const box = await locator.boundingBox();
-    if (!box || !viewport) return null;
-    return {
-      left: Math.max(0, -box.x),
-      top: Math.max(0, -box.y),
-      right: Math.max(0, box.x + box.width - (viewport.width + 1)),
-      bottom: Math.max(0, box.y + box.height - (viewport.height + 1)),
-    };
-  }, {
-    message: 'expected locator bounds to settle inside the viewport',
-    timeout: T.short,
-  }).toEqual({ left: 0, top: 0, right: 0, bottom: 0 });
 }

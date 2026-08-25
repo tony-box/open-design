@@ -11,7 +11,6 @@ import {
   suppressWhatsNew,
   trackRunRequests,
 } from '@/playwright/mock-factory';
-import { CAMPAIGN_DISMISSAL_STORAGE } from '@/playwright/campaign-dismissals';
 import { ensureRailOpen } from '@/playwright/rail';
 import { T } from '@/timeouts';
 
@@ -513,19 +512,11 @@ async function readHomeExampleGeometry(
 
 test.beforeEach(async ({ page }) => {
   await suppressWhatsNew(page);
-  await page.addInitScript(({ key, value, campaigns }) => {
+  await page.addInitScript(({ key, value }) => {
     window.localStorage.clear();
     window.sessionStorage.clear();
     window.localStorage.setItem(key, JSON.stringify(value));
-    // Keep time-boxed marketing surfaces out of functional Home scenarios,
-    // including tests that later mock an authenticated workspace. This clears
-    // storage first, so the suite fixture's seeding is wiped and has to be
-    // reapplied here — from the same source, so a new campaign cannot be
-    // dismissed in one place and left to interrupt specs in the other.
-    for (const [campaignKey, campaignValue] of Object.entries(campaigns)) {
-      window.localStorage.setItem(campaignKey, campaignValue);
-    }
-  }, { key: STORAGE_KEY, value: HOME_CONFIG, campaigns: CAMPAIGN_DISMISSAL_STORAGE });
+  }, { key: STORAGE_KEY, value: HOME_CONFIG });
 
   await page.route('**/api/github/open-design', async (route) => {
     await route.fulfill({

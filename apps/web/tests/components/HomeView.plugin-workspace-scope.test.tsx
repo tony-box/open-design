@@ -97,10 +97,6 @@ vi.mock('../../src/components/HomeHero', () => ({
   }),
 }));
 
-vi.mock('../../src/components/AppWashKineticGrid', () => ({
-  AppWashKineticGrid: () => null,
-}));
-
 import { HomeView } from '../../src/components/HomeView';
 import {
   notifyWorkspaceContextRefresh,
