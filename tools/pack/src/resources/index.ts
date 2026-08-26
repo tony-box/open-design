@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { createPackageManagerInvocation } from "@open-design/platform";
+import type { CommandInvocation } from "@open-design/platform";
 
 const execFileAsync = promisify(execFile);
 
@@ -112,9 +113,11 @@ export type BundledDshRuntimeManifest = {
 export async function packBundledDshRuntime({
   workspaceRoot,
   resourceRoot,
+  packageManagerInvocation,
 }: {
   workspaceRoot: string;
   resourceRoot: string;
+  packageManagerInvocation?: (args: string[]) => CommandInvocation;
 }): Promise<BundledDshRuntimeManifest> {
   const packageRoot = join(workspaceRoot, "packages", "dsh-runtime");
   const packageJson = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8")) as {
@@ -129,10 +132,8 @@ export async function packBundledDshRuntime({
   await rm(destination, { force: true, recursive: true });
   await mkdir(destination, { recursive: true });
 
-  const invocation = createPackageManagerInvocation(
-    ["-C", packageRoot, "pack", "--pack-destination", destination],
-    process.env,
-  );
+  const args = ["-C", packageRoot, "pack", "--pack-destination", destination];
+  const invocation = packageManagerInvocation?.(args) ?? createPackageManagerInvocation(args, process.env);
   await execFileAsync(invocation.command, invocation.args, {
     cwd: workspaceRoot,
     env: process.env,

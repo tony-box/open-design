@@ -572,6 +572,7 @@ async function copyResourceTree(config: ToolPackConfig, paths: LinuxPaths): Prom
   await packBundledDshRuntime({
     workspaceRoot: config.workspaceRoot,
     resourceRoot: paths.resourceRoot,
+    packageManagerInvocation: (args) => resolveLinuxPnpmInvocation(args, process.env),
   });
   await mkdir(join(paths.resourceRoot, "bin"), { recursive: true });
   await cp(process.execPath, join(paths.resourceRoot, "bin", "node"));
