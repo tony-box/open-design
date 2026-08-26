@@ -232,6 +232,8 @@ export function buildDockerArgs(
     "-e",
     "HOME=/home/builder",
     "-e",
+    "CI=true",
+    "-e",
     "ELECTRON_CACHE=/home/builder/.cache/electron",
     "-e",
     "ELECTRON_BUILDER_CACHE=/home/builder/.cache/electron-builder",
