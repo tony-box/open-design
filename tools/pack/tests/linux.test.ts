@@ -7,6 +7,7 @@ import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { requestJsonIpc, resolveAppIpcPath } from "@open-design/sidecar";
+import { createPackageManagerInvocation } from "@open-design/platform";
 import {
   APP_KEYS,
   OPEN_DESIGN_SIDECAR_CONTRACT,
@@ -39,6 +40,7 @@ import {
   renderLinuxPackagedMainEntry,
   resolveLinuxProductName,
   resolveLinuxLifecycleMode,
+  resolveLinuxPnpmInvocation,
   resolveProductionInstallCommand,
   shouldRejectLinuxHeadlessInspectOptions,
   stopPackedLinuxApp,
@@ -694,6 +696,26 @@ describe("resolveProductionInstallCommand", () => {
       args: ["install", "--prod", "--no-lockfile", "--config.node-linker=hoisted"],
     });
     expect(resolved.command).not.toBe("npm");
+  });
+});
+
+describe("resolveLinuxPnpmInvocation", () => {
+  it("uses the standalone pnpm binary when the container provides one", () => {
+    expect(
+      resolveLinuxPnpmInvocation(
+        ["--filter", "@open-design/release", "build"],
+        { OD_TOOLS_PACK_PNPM_BIN: "/tmp/pnpm" },
+      ),
+    ).toEqual({
+      command: "/tmp/pnpm",
+      args: ["--filter", "@open-design/release", "build"],
+    });
+  });
+
+  it("keeps the normal host package-manager invocation by default", () => {
+    expect(resolveLinuxPnpmInvocation(["--version"], {})).toEqual(
+      createPackageManagerInvocation(["--version"], {}),
+    );
   });
 });
 

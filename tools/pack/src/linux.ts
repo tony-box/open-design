@@ -444,7 +444,7 @@ async function runPnpm(
   args: string[],
   extraEnv: NodeJS.ProcessEnv = {},
 ): Promise<void> {
-  const invocation = createPackageManagerInvocation(args, process.env);
+  const invocation = resolveLinuxPnpmInvocation(args, process.env);
   await execFileAsync(invocation.command, invocation.args, {
     cwd: config.workspaceRoot,
     env: { ...process.env, ...extraEnv },
@@ -452,6 +452,16 @@ async function runPnpm(
 }
 
 export type ProductionInstallCommand = { command: string; args: string[] };
+
+export function resolveLinuxPnpmInvocation(
+  args: string[],
+  env: NodeJS.ProcessEnv,
+): ProductionInstallCommand {
+  const pnpmBin = env[PRODUCTION_INSTALL_PNPM_BIN_ENV];
+  return pnpmBin != null && pnpmBin.length > 0
+    ? { command: pnpmBin, args }
+    : createPackageManagerInvocation(args, env);
+}
 
 // Picks the package manager used to materialize the assembled-app node_modules
 // during writeAssembledApp. The default (`npm`) preserves host behavior for
