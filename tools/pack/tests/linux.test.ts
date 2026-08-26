@@ -29,6 +29,7 @@ import type { ToolPackConfig } from "@/config/index.js";
 import {
   buildDockerArgs,
   cleanupPackedLinuxNamespace,
+  createLinuxPackagedConfig,
   createLinuxDesktopLaunchEnv,
   inspectPackedLinuxApp,
   LINUX_APPIMAGE_EXECUTABLE_ARGS,
@@ -36,6 +37,7 @@ import {
   renderDesktopTemplate,
   renderLinuxAppImageAppRun,
   renderLinuxPackagedMainEntry,
+  resolveLinuxProductName,
   resolveLinuxLifecycleMode,
   resolveProductionInstallCommand,
   shouldRejectLinuxHeadlessInspectOptions,
@@ -138,6 +140,14 @@ describe("buildDockerArgs", () => {
     expect(args).toContain("HOME=/home/builder");
     expect(args).toContain("ELECTRON_CACHE=/home/builder/.cache/electron");
     expect(args).toContain("ELECTRON_BUILDER_CACHE=/home/builder/.cache/electron-builder");
+  });
+
+  it("passes a custom packaged product name into containerized builds", () => {
+    const args = buildDockerArgs(
+      { ...makeConfig(), productName: "Open Open Design" },
+      { uid: 1000, gid: 1000 },
+    );
+    expect(args).toContain("OD_PACKAGED_PRODUCT_NAME=Open Open Design");
   });
 
   it("passes the telemetry relay URL into containerized builds when configured", () => {
@@ -321,6 +331,33 @@ describe("buildDockerArgs", () => {
       (arg, i) => arg === "-e" && args[i + 1] === "OD_TOOLS_PACK_PNPM_BIN=/tmp/pnpm",
     );
     expect(envFlagIndex).toBeGreaterThan(-1);
+  });
+});
+
+describe("resolveLinuxProductName", () => {
+  it("uses the canonical name by default", () => {
+    expect(resolveLinuxProductName({})).toBe("Open Design");
+  });
+
+  it("uses the configured packaged product name", () => {
+    expect(resolveLinuxProductName({ productName: "Open Open Design" })).toBe("Open Open Design");
+  });
+});
+
+describe("createLinuxPackagedConfig", () => {
+  it("includes a custom product name and omits local roots for portable builds", () => {
+    const config = {
+      ...makeConfig(),
+      portable: true,
+      productName: "Open Open Design",
+    };
+
+    expect(createLinuxPackagedConfig(config, "0.18.1")).toMatchObject({
+      appVersion: "0.18.1",
+      namespace: "default",
+      productName: "Open Open Design",
+    });
+    expect(createLinuxPackagedConfig(config, "0.18.1")).not.toHaveProperty("namespaceBaseRoot");
   });
 });
 

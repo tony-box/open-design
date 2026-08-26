@@ -71,6 +71,26 @@ export function sanitizeNamespace(value: string): string {
   return value.replace(/[^A-Za-z0-9._-]+/g, "-");
 }
 
+export function resolveLinuxProductName(config: Pick<ToolPackConfig, "productName">): string {
+  return config.productName ?? PRODUCT_NAME;
+}
+
+export function createLinuxPackagedConfig(config: ToolPackConfig, version: string): Record<string, unknown> {
+  return {
+    ...(config.amrProfile == null ? {} : { amrProfile: config.amrProfile }),
+    appVersion: version,
+    namespace: config.namespace,
+    nodeCommandRelative: "open-design/bin/node",
+    ...(config.telemetryRelayUrl == null ? {} : { telemetryRelayUrl: config.telemetryRelayUrl }),
+    ...(config.posthogKey == null ? {} : { posthogKey: config.posthogKey }),
+    ...(config.posthogHost == null ? {} : { posthogHost: config.posthogHost }),
+    ...(config.productName == null ? {} : { productName: config.productName }),
+    ...(config.velaWebUrl == null ? {} : { velaWebUrl: config.velaWebUrl }),
+    ...(config.velaWebUrls == null ? {} : { velaWebUrls: config.velaWebUrls }),
+    ...(config.portable ? {} : { namespaceBaseRoot: config.roots.runtime.namespaceBaseRoot }),
+  };
+}
+
 export type LinuxLifecycleAction = "cleanup" | "install" | "start" | "stop" | "uninstall";
 export type LinuxLifecycleMode = "appimage" | "headless";
 
@@ -218,6 +238,9 @@ export function buildDockerArgs(
     "-e",
     `${PRODUCTION_INSTALL_PNPM_BIN_ENV}=${CONTAINER_PNPM_PATH}`,
   ];
+  if (config.productName != null) {
+    dockerArgs.push("-e", `OD_PACKAGED_PRODUCT_NAME=${config.productName}`);
+  }
   if (config.telemetryRelayUrl != null) {
     dockerArgs.push("-e", `OPEN_DESIGN_TELEMETRY_RELAY_URL=${config.telemetryRelayUrl}`);
   }
@@ -588,22 +611,7 @@ async function writeAssembledApp(
 
   await writeFile(
     paths.packagedConfigPath,
-    `${JSON.stringify(
-      {
-        ...(config.amrProfile == null ? {} : { amrProfile: config.amrProfile }),
-        appVersion: version,
-        namespace: config.namespace,
-        nodeCommandRelative: "open-design/bin/node",
-        ...(config.telemetryRelayUrl == null ? {} : { telemetryRelayUrl: config.telemetryRelayUrl }),
-        ...(config.posthogKey == null ? {} : { posthogKey: config.posthogKey }),
-        ...(config.posthogHost == null ? {} : { posthogHost: config.posthogHost }),
-        ...(config.velaWebUrl == null ? {} : { velaWebUrl: config.velaWebUrl }),
-        ...(config.velaWebUrls == null ? {} : { velaWebUrls: config.velaWebUrls }),
-        ...(config.portable ? {} : { namespaceBaseRoot: config.roots.runtime.namespaceBaseRoot }),
-      },
-      null,
-      2,
-    )}\n`,
+    `${JSON.stringify(createLinuxPackagedConfig(config, version), null, 2)}\n`,
     "utf8",
   );
 
@@ -623,6 +631,7 @@ async function writeLinuxBuilderConfig(config: ToolPackConfig, paths: LinuxPaths
   const namespaceToken = sanitizeNamespace(config.namespace);
   const packagedVersion = await readPackagedVersion(config);
   const packageVersion = electronBuilderVersionForAppVersion(packagedVersion);
+  const productName = resolveLinuxProductName(config);
 
   const builderConfig: Record<string, unknown> = {
     appId: "io.open-design.desktop",
@@ -643,7 +652,7 @@ async function writeLinuxBuilderConfig(config: ToolPackConfig, paths: LinuxPaths
     extraMetadata: {
       main: "./main.cjs",
       name: "open-design-packaged-app",
-      productName: PRODUCT_NAME,
+      productName,
       version: packageVersion,
       ...(config.portable ? {} : { odToolsPackRuntimeRoot: config.roots.runtime.namespaceBaseRoot }),
     },
@@ -670,7 +679,7 @@ async function writeLinuxBuilderConfig(config: ToolPackConfig, paths: LinuxPaths
       target,
       icon: linuxResources.icon,
       category: "Development",
-      synopsis: "Open Design",
+      synopsis: productName,
       maintainer: "Open Design Contributors",
     },
     // Keep the AppImage launch fallback explicit. Our top-level AppRun wrapper
@@ -681,7 +690,7 @@ async function writeLinuxBuilderConfig(config: ToolPackConfig, paths: LinuxPaths
     },
     nodeGypRebuild: false,
     npmRebuild: false,
-    productName: PRODUCT_NAME,
+    productName,
   };
 
   await mkdir(dirname(paths.appBuilderConfigPath), { recursive: true });

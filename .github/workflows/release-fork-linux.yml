@@ -1,0 +1,127 @@
+name: release-fork-linux
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing GitHub release tag to receive the AppImage.
+        required: true
+        type: string
+        default: open-open-design-v0.18.1
+      release_version:
+        description: Version baked into the Linux package.
+        required: true
+        type: string
+        default: 0.18.1
+
+permissions:
+  contents: write
+
+concurrency:
+  group: open-open-design-linux-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Linux x64 AppImage
+    runs-on: ubuntu-latest
+    env:
+      OD_PACKAGED_PRODUCT_NAME: Open Open Design
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build AppImage
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          build_json="$RUNNER_TEMP/linux-tools-pack-build.json"
+          build_output="$(pnpm exec tools-pack linux build \
+            --dir "$RUNNER_TEMP/tools-pack" \
+            --namespace open-open-design \
+            --portable \
+            --app-version "${{ inputs.release_version }}" \
+            --to appimage \
+            --containerized \
+            --json)"
+          printf '%s\n' "$build_output" | tee "$build_json"
+          appimage_path="$(jq -r '.appImagePath // empty' "$build_json")"
+          if [ -z "$appimage_path" ] || [ ! -f "$appimage_path" ]; then
+            echo "tools-pack did not produce an AppImage: $appimage_path" >&2
+            exit 1
+          fi
+          asset_dir="$RUNNER_TEMP/release-assets"
+          asset_name="open-open-design-${{ inputs.release_version }}-linux-x64.AppImage"
+          mkdir -p "$asset_dir"
+          cp "$appimage_path" "$asset_dir/$asset_name"
+          chmod +x "$asset_dir/$asset_name"
+          (cd "$asset_dir" && sha256sum "$asset_name" > "$asset_name.sha256")
+          echo "asset_name=$asset_name" >> "$GITHUB_OUTPUT"
+
+      - name: Verify AppImage identity is portable
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset="$RUNNER_TEMP/release-assets/${{ steps.build.outputs.asset_name }}"
+          extract_dir="$RUNNER_TEMP/open-open-design-appimage"
+          mkdir -p "$extract_dir"
+          (cd "$extract_dir" && "$asset" --appimage-extract >/dev/null)
+          config="$extract_dir/squashfs-root/resources/open-design-config.json"
+          test -f "$config"
+          cat "$config"
+          test "$(jq -r '.appVersion' "$config")" = "${{ inputs.release_version }}"
+          test "$(jq -r '.productName' "$config")" = "Open Open Design"
+          test "$(jq -r '.namespace' "$config")" = "open-open-design"
+          if [ "$(jq -r 'has("namespaceBaseRoot")' "$config")" != "false" ]; then
+            echo "packaged config baked namespaceBaseRoot; build was not portable" >&2
+            exit 1
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: open-open-design-linux-x64
+          path: ${{ runner.temp }}/release-assets/*
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload AppImage to existing prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release view "${{ inputs.release_tag }}" --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh release upload "${{ inputs.release_tag }}" \
+            "$RUNNER_TEMP/release-assets"/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
+      - name: Publish summary
+        shell: bash
+        run: |
+          {
+            echo "## Open Open Design Linux package"
+            echo
+            echo "- release: ${{ inputs.release_tag }}"
+            echo "- version: ${{ inputs.release_version }}"
+            echo "- product: Open Open Design"
+            echo "- package: x64 AppImage"
+            echo "- portable: yes (no namespaceBaseRoot baked into packaged config)"
+            echo "- signing: unsigned"
+          } >> "$GITHUB_STEP_SUMMARY"
