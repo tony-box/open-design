@@ -195,7 +195,7 @@ export function buildDockerArgs(
     `chmod +x ${CONTAINER_PNPM_PATH} && ` +
     `PNPM_HOME=${CONTAINER_PNPM_HOME} PATH=${CONTAINER_PNPM_HOME}:$PATH ${CONTAINER_PNPM_PATH} env use --global ${CONTAINER_NODE_VERSION} && ` +
     `export PNPM_HOME=${CONTAINER_PNPM_HOME} PATH=${CONTAINER_PNPM_HOME}:$PATH && ` +
-    `command -v node >/dev/null`;
+    `command -v node >/dev/null && command -v npm >/dev/null`;
   const pnpmCmd = CONTAINER_PNPM_PATH;
   const innerArgs = [
     `node ${CONTAINER_TOOLS_PACK_CLI_PATH} linux build`,
@@ -463,28 +463,16 @@ export function resolveLinuxPnpmInvocation(
     : createPackageManagerInvocation(args, env);
 }
 
-// Picks the package manager used to materialize the assembled-app node_modules
-// during writeAssembledApp. The default (`npm`) preserves host behavior for
-// developer-machine builds. When the build runs inside
-// `electronuserland/builder:base` (which strips npm, npx, and corepack),
-// buildDockerArgs sets OD_TOOLS_PACK_PNPM_BIN to the standalone pnpm binary it
-// bootstrapped, and this resolver routes the install through that binary.
-// `--config.node-linker=hoisted` keeps the resulting layout flat so
-// electron-builder packs node_modules the same way it does for npm-installed
-// trees.
-export function resolveProductionInstallCommand(env: NodeJS.ProcessEnv): ProductionInstallCommand {
-  const pnpmBin = env[PRODUCTION_INSTALL_PNPM_BIN_ENV];
-  if (pnpmBin != null && pnpmBin.length > 0) {
-    return {
-      command: pnpmBin,
-      args: ["install", "--prod", "--no-lockfile", "--config.node-linker=hoisted"],
-    };
-  }
+// The assembled app depends on sibling local tarballs whose transitive
+// workspace versions are not published. npm resolves those tarballs from the
+// top-level dependency set; pnpm attempts registry resolution instead. The
+// container bootstrap installs npm with Node and asserts it is on PATH.
+export function resolveProductionInstallCommand(): ProductionInstallCommand {
   return { command: "npm", args: ["install", "--omit=dev", "--no-package-lock"] };
 }
 
 async function runProductionInstall(appRoot: string): Promise<void> {
-  const { command, args } = resolveProductionInstallCommand(process.env);
+  const { command, args } = resolveProductionInstallCommand();
   await execFileAsync(command, args, {
     cwd: appRoot,
     env: process.env,

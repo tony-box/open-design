@@ -208,6 +208,7 @@ describe("buildDockerArgs", () => {
     expect(last).toMatch(/mv \/tmp\/pnpm\.tmp \/tmp\/pnpm/);
     expect(last).toMatch(/chmod \+x \/tmp\/pnpm/);
     expect(last).toMatch(/\/tmp\/pnpm env use --global 24\.\d+\.\d+/);
+    expect(last).toContain("command -v node >/dev/null && command -v npm >/dev/null");
     expect(last).toMatch(/\/tmp\/pnpm install --frozen-lockfile/);
     expect(last).toMatch(/node tools\/pack\/bin\/tools-pack\.mjs linux build --to all --namespace default/);
     expect(last).not.toMatch(/\/tmp\/pnpm tools-pack linux build/);
@@ -655,33 +656,14 @@ describe("stopPackedLinuxApp", () => {
 });
 
 describe("resolveProductionInstallCommand", () => {
-  it("defaults to npm install --omit=dev --no-package-lock when OD_TOOLS_PACK_PNPM_BIN is unset", () => {
-    expect(resolveProductionInstallCommand({})).toEqual({
+  it("uses npm to resolve the assembled local tarball graph", () => {
+    expect(resolveProductionInstallCommand()).toEqual({
       command: "npm",
       args: ["install", "--omit=dev", "--no-package-lock"],
     });
   });
 
-  it("treats an empty OD_TOOLS_PACK_PNPM_BIN as unset and keeps the npm host default", () => {
-    expect(resolveProductionInstallCommand({ OD_TOOLS_PACK_PNPM_BIN: "" })).toEqual({
-      command: "npm",
-      args: ["install", "--omit=dev", "--no-package-lock"],
-    });
-  });
-
-  it("uses OD_TOOLS_PACK_PNPM_BIN with hoisted-layout pnpm flags when set", () => {
-    // --config.node-linker=hoisted intentionally matches the prior
-    // npm/electron-builder packaging layout so the AppImage pack step keeps
-    // working when the assembled-app install runs through pnpm.
-    expect(
-      resolveProductionInstallCommand({ OD_TOOLS_PACK_PNPM_BIN: "/tmp/pnpm" }),
-    ).toEqual({
-      command: "/tmp/pnpm",
-      args: ["install", "--prod", "--no-lockfile", "--config.node-linker=hoisted"],
-    });
-  });
-
-  it("chains end-to-end with buildDockerArgs: docker exports OD_TOOLS_PACK_PNPM_BIN and the resolver returns the standalone pnpm install for that value", () => {
+  it("keeps standalone pnpm for workspace commands without using it for production install", () => {
     const dockerArgs = buildDockerArgs(makeConfig(), { uid: 1000, gid: 1000 });
     const envFlagIndex = dockerArgs.findIndex(
       (arg, i) => arg === "-e" && dockerArgs[i + 1]?.startsWith("OD_TOOLS_PACK_PNPM_BIN="),
@@ -689,13 +671,7 @@ describe("resolveProductionInstallCommand", () => {
     expect(envFlagIndex).toBeGreaterThan(-1);
     const envValue = dockerArgs[envFlagIndex + 1]?.split("=")[1];
     expect(envValue).toBe("/tmp/pnpm");
-
-    const resolved = resolveProductionInstallCommand({ OD_TOOLS_PACK_PNPM_BIN: envValue });
-    expect(resolved).toEqual({
-      command: "/tmp/pnpm",
-      args: ["install", "--prod", "--no-lockfile", "--config.node-linker=hoisted"],
-    });
-    expect(resolved.command).not.toBe("npm");
+    expect(resolveProductionInstallCommand().command).toBe("npm");
   });
 });
 
