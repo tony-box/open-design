@@ -62,7 +62,7 @@ jobs:
             --containerized \
             --json)"
           printf '%s\n' "$build_output" | tee "$build_json"
-          appimage_path="$(jq -r '.appImagePath // empty' "$build_json")"
+          appimage_path="$(jq -rs 'map(select(.containerized == true)) | last | .appImagePath // empty' "$build_json")"
           if [ -z "$appimage_path" ] || [ ! -f "$appimage_path" ]; then
             echo "tools-pack did not produce an AppImage: $appimage_path" >&2
             exit 1
