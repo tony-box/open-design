@@ -7,12 +7,12 @@ on:
         description: Existing GitHub release tag to receive the AppImage.
         required: true
         type: string
-        default: open-open-design-v0.18.1
+        default: open-open-design-v0.20.3-open.2
       release_version:
         description: Version baked into the Linux package.
         required: true
         type: string
-        default: 0.18.1
+        default: 0.20.3-open.2
 
 permissions:
   contents: write
