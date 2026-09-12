@@ -1,6 +1,6 @@
 ---
 name: concept-architecture-studio
-description: Use this plugin to brainstorm close-to-accurate concept architecture with dimensioned plans, elevations, sections, conceptual MEP layouts, advisory local-code research, and an interactive 3D walkthrough.
+description: Use this plugin to brainstorm close-to-accurate concept architecture with dimensioned plans, project-axis elevations, conceptual MEP layouts, advisory local-code research, and an interactive 3D walkthrough.
 license: MIT
 metadata:
   author: OpenDesign Community
@@ -38,8 +38,10 @@ survey accurate, or professionally engineered.
 6. Stabilize the architectural envelope, then place and route conceptual
    plumbing, electrical, and mechanical systems according to
    `references/mep-concept-rules.md`.
-7. Copy `assets/studio-template.html` to `index.html` and generate derived SVG
-   plans, elevations, and sections from the same model coordinates.
+7. Copy `assets/studio-template.html` to `index.html`. Version 0.1 renders
+   dimensioned plans, project-axis elevations, systems, and a conceptual 3D
+   model. Preserve section definitions for professional handoff, but do not
+   claim that this version renders or exports sections.
 8. Run the cross-view checklist in `references/checklist.md`, then write
    `ASSUMPTIONS.md` and `HANDOFF.md` for the architect and engineering team.
 
@@ -51,7 +53,6 @@ models/building.json
 models/variants/*.json            # optional complete alternatives
 exports/plans/*.svg
 exports/elevations/*.svg
-exports/sections/*.svg
 reviews/code-findings.json
 reviews/code-review.md
 ASSUMPTIONS.md

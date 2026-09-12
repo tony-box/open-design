@@ -420,7 +420,7 @@
       "fromLevelId": "level-ground",
       "toLevelId": "level-upper",
       "start": { "x": 4700, "y": 12200 },
-      "end": { "x": 4700, "y": 7300 },
+      "end": { "x": 4700, "y": 6220 },
       "widthMm": 1100,
       "riserCount": 23,
       "treadDepthMm": 260,
@@ -500,9 +500,9 @@
         { "id": "plumbing-kitchen", "kind": "fixture-connection", "position": { "x": 7200, "y": 6200, "z": 4350 }, "levelId": "level-upper", "evidence": { "source": "generated", "confidence": 0.7, "status": "needs-review", "note": "Kitchen connection." } }
       ],
       "edges": [
-        { "id": "plumbing-edge-entry-stack", "from": "plumbing-entry", "to": "plumbing-stack", "path": [{ "x": 0, "y": 10800, "z": 300 }, { "x": 3300, "y": 10800, "z": 300 }, { "x": 3300, "y": 10100, "z": 300 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.55, "status": "needs-review", "note": "Concept route; slope and sizing unresolved." } },
-        { "id": "plumbing-edge-sink", "from": "plumbing-stack", "to": "plumbing-sink", "path": [{ "x": 3300, "y": 10100, "z": 400 }, { "x": 900, "y": 10100, "z": 400 }, { "x": 900, "y": 9800, "z": 450 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.6, "status": "needs-review", "note": "Concept branch." } },
-        { "id": "plumbing-edge-bath", "from": "plumbing-stack", "to": "plumbing-bath", "path": [{ "x": 3300, "y": 10100, "z": 400 }, { "x": 3300, "y": 10100, "z": 4350 }, { "x": 6900, "y": 10100, "z": 4350 }, { "x": 6900, "y": 10300, "z": 4350 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.6, "status": "needs-review", "note": "Concept vertical and horizontal route." } },
+        { "id": "plumbing-edge-entry-stack", "from": "plumbing-entry", "to": "plumbing-stack", "path": [{ "x": 0, "y": 10800, "z": 0 }, { "x": 3300, "y": 10800, "z": 0 }, { "x": 3300, "y": 10100, "z": 0 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.55, "status": "needs-review", "note": "Concept route; slope and sizing unresolved." } },
+        { "id": "plumbing-edge-sink", "from": "plumbing-stack", "to": "plumbing-sink", "path": [{ "x": 3300, "y": 10100, "z": 0 }, { "x": 900, "y": 10100, "z": 400 }, { "x": 900, "y": 9800, "z": 450 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.6, "status": "needs-review", "note": "Concept branch." } },
+        { "id": "plumbing-edge-bath", "from": "plumbing-stack", "to": "plumbing-bath", "path": [{ "x": 3300, "y": 10100, "z": 0 }, { "x": 3300, "y": 10100, "z": 4350 }, { "x": 6900, "y": 10100, "z": 4350 }, { "x": 6900, "y": 10300, "z": 4350 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.6, "status": "needs-review", "note": "Concept vertical and horizontal route." } },
         { "id": "plumbing-edge-kitchen", "from": "plumbing-bath", "to": "plumbing-kitchen", "path": [{ "x": 6900, "y": 10300, "z": 4350 }, { "x": 6900, "y": 6200, "z": 4350 }, { "x": 7200, "y": 6200, "z": 4350 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.55, "status": "needs-review", "note": "Concept branch; routing strategy requires plumbing review." } }
       ],
       "evidence": { "source": "generated", "confidence": 0.6, "status": "needs-review", "note": "Concept plumbing network only." }
@@ -518,8 +518,8 @@
         { "id": "electrical-upper", "kind": "upper-distribution", "position": { "x": 4800, "y": 7600, "z": 6200 }, "levelId": "level-upper", "evidence": { "source": "generated", "confidence": 0.6, "status": "needs-review", "note": "Concept upper distribution point." } }
       ],
       "edges": [
-        { "id": "electrical-edge-shop", "from": "electrical-panel", "to": "electrical-shop", "path": [{ "x": 700, "y": 11400, "z": 2800 }, { "x": 4800, "y": 11400, "z": 2800 }, { "x": 4800, "y": 4500, "z": 2800 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.55, "status": "needs-review", "note": "Concept route; loads, conductor, and protection unresolved." } },
-        { "id": "electrical-edge-upper", "from": "electrical-panel", "to": "electrical-upper", "path": [{ "x": 700, "y": 11400, "z": 2800 }, { "x": 700, "y": 7600, "z": 6200 }, { "x": 4800, "y": 7600, "z": 6200 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.55, "status": "needs-review", "note": "Concept riser and distribution path." } }
+        { "id": "electrical-edge-shop", "from": "electrical-panel", "to": "electrical-shop", "path": [{ "x": 700, "y": 11400, "z": 1500 }, { "x": 4800, "y": 11400, "z": 2800 }, { "x": 4800, "y": 4500, "z": 2800 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.55, "status": "needs-review", "note": "Concept route; loads, conductor, and protection unresolved." } },
+        { "id": "electrical-edge-upper", "from": "electrical-panel", "to": "electrical-upper", "path": [{ "x": 700, "y": 11400, "z": 1500 }, { "x": 700, "y": 7600, "z": 6200 }, { "x": 4800, "y": 7600, "z": 6200 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.55, "status": "needs-review", "note": "Concept riser and distribution path." } }
       ],
       "evidence": { "source": "generated", "confidence": 0.6, "status": "needs-review", "note": "Concept electrical network only." }
     },
@@ -536,8 +536,8 @@
       ],
       "edges": [
         { "id": "mechanical-edge-refrigerant", "from": "mechanical-heat-pump", "to": "mechanical-air-handler", "path": [{ "x": -900, "y": 10800, "z": 500 }, { "x": 1800, "y": 10800, "z": 2400 }, { "x": 1800, "y": 11100, "z": 2400 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.5, "status": "needs-review", "note": "Concept line-set path." } },
-        { "id": "mechanical-edge-shop", "from": "mechanical-air-handler", "to": "mechanical-shop", "path": [{ "x": 1800, "y": 11100, "z": 3200 }, { "x": 4800, "y": 11100, "z": 3200 }, { "x": 4800, "y": 4500, "z": 3200 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.5, "status": "needs-review", "note": "Concept shop supply path." } },
-        { "id": "mechanical-edge-upper", "from": "mechanical-air-handler", "to": "mechanical-upper", "path": [{ "x": 1800, "y": 11100, "z": 3200 }, { "x": 1800, "y": 6000, "z": 6500 }, { "x": 4800, "y": 6000, "z": 6500 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.5, "status": "needs-review", "note": "Concept upper supply path; return path unresolved." } }
+        { "id": "mechanical-edge-shop", "from": "mechanical-air-handler", "to": "mechanical-shop", "path": [{ "x": 1800, "y": 11100, "z": 2400 }, { "x": 4800, "y": 11100, "z": 3200 }, { "x": 4800, "y": 4500, "z": 3200 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.5, "status": "needs-review", "note": "Concept shop supply path." } },
+        { "id": "mechanical-edge-upper", "from": "mechanical-air-handler", "to": "mechanical-upper", "path": [{ "x": 1800, "y": 11100, "z": 2400 }, { "x": 1800, "y": 6000, "z": 6500 }, { "x": 4800, "y": 6000, "z": 6500 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.5, "status": "needs-review", "note": "Concept upper supply path; return path unresolved." } }
       ],
       "evidence": { "source": "generated", "confidence": 0.55, "status": "needs-review", "note": "Concept mechanical network only; loads and equipment selection excluded." }
     }

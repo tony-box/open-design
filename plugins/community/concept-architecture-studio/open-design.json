@@ -4,7 +4,7 @@
   "name": "concept-architecture-studio",
   "title": "Concept Architecture Studio",
   "version": "0.1.0",
-  "description": "Explore close-to-accurate building concepts through one coordinate model that drives plans, elevations, sections, conceptual MEP systems, advisory code review, and a 3D walkthrough.",
+  "description": "Explore close-to-accurate building concepts through one coordinate model that drives plans, project-axis elevations, conceptual MEP systems, advisory code review, and a 3D walkthrough.",
   "license": "MIT",
   "author": {
     "name": "OpenDesign Community",
@@ -41,7 +41,7 @@
     },
     "useCase": {
       "query": {
-        "en": "Develop a close-to-accurate concept architecture package for {{project_name}} in {{jurisdiction}}. Program: {{building_program}}. Target approximately {{area}} across {{levels}} level(s), using {{display_units}}. Produce one coordinate-driven model, plans, elevations, sections, conceptual MEP placement and routes, an advisory cited code review, and an interactive 3D walkthrough."
+        "en": "Develop a close-to-accurate concept architecture package for {{project_name}} in {{jurisdiction}}. Program: {{building_program}}. Target approximately {{area}} across {{levels}} level(s), using {{display_units}}. Produce one coordinate-driven model, dimensioned plans, project-axis elevations, conceptual MEP placement and routes, an advisory cited code review, and an interactive 3D walkthrough."
       }
     },
     "context": {

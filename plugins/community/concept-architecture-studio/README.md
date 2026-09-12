@@ -2,7 +2,7 @@
 
 Concept Architecture Studio is a portable OpenDesign plugin for exploring
 dimensionally consistent building ideas before professional design begins. One
-structured coordinate model drives plans, elevations, sections, conceptual
+structured coordinate model drives plans, project-axis elevations, conceptual
 plumbing/electrical/mechanical systems, and an interactive 3D view.
 
 ## Scope
@@ -45,7 +45,6 @@ models/building.json
 models/variants/*.json
 exports/plans/*.svg
 exports/elevations/*.svg
-exports/sections/*.svg
 reviews/code-findings.json
 reviews/code-review.md
 ASSUMPTIONS.md
@@ -70,6 +69,7 @@ private address, satellite imagery, photographs, or construction documents.
 ## Development Validation
 
 ```bash
+node --experimental-strip-types --test plugins/community/concept-architecture-studio/tests/studio-template.test.ts
 corepack pnpm exec od plugin validate ./plugins/community/concept-architecture-studio --no-daemon
 corepack pnpm guard
 corepack pnpm --filter @open-design/plugin-runtime typecheck
@@ -77,3 +77,8 @@ corepack pnpm --filter @open-design/plugin-runtime typecheck
 
 Visual acceptance must confirm that plan, elevation, systems, and 3D views all
 use the same openings, levels, stair, roof, and system coordinates.
+
+Version 0.1 accepts section definitions for professional handoff but does not
+render or export section drawings. Slabs must be axis-aligned rectangles, and
+the active model may contain one axis-aligned rectangular gable roof. The
+studio blocks unsupported or invalid geometry instead of approximating it.

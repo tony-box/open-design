@@ -150,7 +150,7 @@
     <section class="stage">
       <div class="toolbar">
         <label id="level-control">Level <select id="level"></select></label>
-        <label id="elevation-control" class="hidden-view">View <select id="elevation"><option value="north">North</option><option value="east">East</option><option value="south">South</option><option value="west">West</option></select></label>
+        <label id="elevation-control" class="hidden-view">View <select id="elevation"><option value="north">Project North</option><option value="east">Project East</option><option value="south">Project South</option><option value="west">Project West</option></select></label>
         <button class="tool" id="mode-orbit" aria-pressed="true">Orbit</button>
         <button class="tool" id="mode-walk" aria-pressed="false">Walk</button>
         <button class="tool system-toggle" data-system="plumbing" aria-pressed="true">Plumbing</button>
@@ -176,6 +176,7 @@
   const COLORS = { plumbing: '#315fa3', electrical: '#b64b34', mechanical: '#187773' };
   const state = {
     model: null,
+    codeReport: { status: 'missing', message: 'No advisory code report was staged.' },
     view: 'plan',
     levelId: null,
     elevation: 'north',
@@ -214,16 +215,58 @@
 
   function allEntityIds(model) {
     const groups = ['levels', 'spaces', 'walls', 'openings', 'slabs', 'roofs', 'stairs', 'fixtures', 'equipment', 'systems', 'dimensions', 'sections', 'viewpoints', 'assumptions'];
-    const entities = [model.project];
+    const entities = model?.project ? [model.project] : [];
     for (const group of groups) entities.push(...(model[group] ?? []));
-    for (const system of model.systems ?? []) entities.push(...system.nodes, ...system.edges);
+    for (const system of model?.systems ?? []) entities.push(...(system.nodes ?? []), ...(system.edges ?? []));
     return entities;
+  }
+
+  const isFiniteInteger = value => Number.isInteger(value) && Number.isFinite(value);
+  const samePoint = (a, b, tolerance = 0) => Math.hypot(a.x - b.x, a.y - b.y, (a.z ?? 0) - (b.z ?? 0)) <= tolerance;
+  const orientation = (a, b, c) => Math.sign((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x));
+  const onSegment = (a, b, p) => Math.min(a.x, b.x) <= p.x && p.x <= Math.max(a.x, b.x) && Math.min(a.y, b.y) <= p.y && p.y <= Math.max(a.y, b.y);
+  function segmentsIntersect(a, b, c, d) {
+    const abC = orientation(a, b, c), abD = orientation(a, b, d), cdA = orientation(c, d, a), cdB = orientation(c, d, b);
+    if (abC !== abD && cdA !== cdB) return true;
+    return (abC === 0 && onSegment(a, b, c)) || (abD === 0 && onSegment(a, b, d)) || (cdA === 0 && onSegment(c, d, a)) || (cdB === 0 && onSegment(c, d, b));
+  }
+  function polygonIssues(points) {
+    if (!Array.isArray(points) || points.length < 3) return ['fewer than three points'];
+    const distinct = new Set(points.map(point => `${point.x},${point.y}`));
+    const issues = [];
+    if (distinct.size < 3) issues.push('fewer than three distinct points');
+    const area = points.reduce((sum, point, index) => {
+      const next = points[(index + 1) % points.length];
+      return sum + point.x * next.y - next.x * point.y;
+    }, 0) / 2;
+    if (Math.abs(area) < 1) issues.push('zero area');
+    for (let i = 0; i < points.length; i += 1) {
+      const a = points[i], b = points[(i + 1) % points.length];
+      for (let j = i + 1; j < points.length; j += 1) {
+        if (j === i || j === (i + 1) % points.length || (i === 0 && j === points.length - 1)) continue;
+        const c = points[j], d = points[(j + 1) % points.length];
+        if (segmentsIntersect(a, b, c, d)) issues.push('self-intersection');
+      }
+    }
+    return [...new Set(issues)];
+  }
+  function rectangleBounds(points) {
+    if (polygonIssues(points).length || points.length !== 4) return null;
+    const xs = [...new Set(points.map(point => point.x))], ys = [...new Set(points.map(point => point.y))];
+    if (xs.length !== 2 || ys.length !== 2) return null;
+    const corners = new Set(points.map(point => `${point.x},${point.y}`));
+    if (!xs.every(x => ys.every(y => corners.has(`${x},${y}`)))) return null;
+    return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
   }
 
   function validateModel(model) {
     const findings = [];
     const add = (severity, code, message, entityId) => findings.push({ severity, code, message, entityId });
     if (model?.schemaVersion !== '1.0.0') add('error', 'schema.version', 'Expected schemaVersion 1.0.0.');
+    if (!model?.project || typeof model.project.name !== 'string' || !model.project.coordinates || !model.project.jurisdiction) add('error', 'schema.project', 'Project metadata, coordinates, and jurisdiction are required.');
+    const requiredArrays = ['levels', 'spaces', 'walls', 'openings', 'slabs', 'roofs', 'stairs', 'fixtures', 'equipment', 'systems', 'assumptions'];
+    for (const key of requiredArrays) if (!Array.isArray(model?.[key])) add('error', 'schema.array', `${key} must be an array.`);
+    if (findings.some(item => item.severity === 'error')) return findings;
     const ids = new Set(); let reviewEvidenceCount = 0;
     for (const entity of allEntityIds(model)) {
       if (!entity?.id) { add('error', 'entity.id', 'An entity is missing its stable ID.'); continue; }
@@ -234,34 +277,65 @@
     if (reviewEvidenceCount > 0) add('advisory', 'evidence.review', `${reviewEvidenceCount} entities carry low-confidence or needs-review evidence.`, model.project?.id);
     const levels = new Map((model.levels ?? []).map(level => [level.id, level]));
     const walls = new Map((model.walls ?? []).map(wall => [wall.id, wall]));
-    for (const entity of [...(model.spaces ?? []), ...(model.walls ?? []), ...(model.slabs ?? []), ...(model.fixtures ?? []), ...(model.equipment ?? [])]) {
+    const tolerance = model.project.coordinates.toleranceMm ?? 3;
+    const elevations = new Set();
+    for (const level of model.levels) {
+      if (!isFiniteInteger(level.elevationMm)) add('error', 'level.elevation', 'Level elevation must be an integer millimeter value.', level.id);
+      if (elevations.has(level.elevationMm)) add('error', 'level.duplicate-elevation', `Multiple levels use elevation ${level.elevationMm} mm.`, level.id);
+      elevations.add(level.elevationMm);
+    }
+    for (const entity of [...model.spaces, ...model.walls, ...model.slabs, ...model.fixtures, ...model.equipment, ...model.roofs]) {
       if (!levels.has(entity.levelId)) add('error', 'reference.level', `Unknown level ${entity.levelId}.`, entity.id);
+    }
+    for (const entity of [...model.spaces, ...model.slabs, ...model.roofs]) {
+      const points = entity.boundary ?? entity.footprint;
+      const issues = polygonIssues(points);
+      if (issues.length) add('error', 'polygon.geometry', `Polygon has ${issues.join(', ')}.`, entity.id);
+    }
+    for (const slab of model.slabs) if (!rectangleBounds(slab.boundary)) add('error', 'renderer.unsupported-slab', 'Version 0.1 renders only axis-aligned rectangular slabs.', slab.id);
+    if (model.roofs.length > 1) add('error', 'renderer.unsupported-roofs', 'Version 0.1 renders one roof only.');
+    for (const roof of model.roofs) {
+      if (roof.kind !== 'gable' || !rectangleBounds(roof.footprint)) add('error', 'renderer.unsupported-roof', 'Version 0.1 renders one axis-aligned rectangular gable roof only.', roof.id);
+      if (roof.ridgeElevationMm <= roof.eaveElevationMm) add('error', 'roof.geometry', 'Roof ridge must be above its eave.', roof.id);
     }
     for (const wall of model.walls ?? []) {
       const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
-      if (length < 1 || wall.thicknessMm < 1 || wall.heightMm < 1) add('error', 'wall.geometry', 'Wall has invalid length, thickness, or height.', wall.id);
+      if (length < 1 || !isFiniteInteger(wall.thicknessMm) || wall.thicknessMm < 1 || !isFiniteInteger(wall.heightMm) || wall.heightMm < 1) add('error', 'wall.geometry', 'Wall has invalid length, thickness, or height.', wall.id);
     }
     for (const opening of model.openings ?? []) {
       const wall = walls.get(opening.wallId);
       if (!wall) { add('error', 'reference.wall', `Unknown wall ${opening.wallId}.`, opening.id); continue; }
       const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
-      if (opening.offsetMm + opening.widthMm > length + 3 || opening.sillMm + opening.heightMm > wall.heightMm + 3) add('error', 'opening.fit', 'Opening falls outside its host wall.', opening.id);
+      if (![opening.offsetMm, opening.widthMm, opening.heightMm, opening.sillMm].every(isFiniteInteger) || opening.offsetMm < 0 || opening.widthMm < 1 || opening.heightMm < 1 || opening.sillMm < 0) add('error', 'opening.geometry', 'Opening offsets and dimensions must be valid non-negative integer millimeters.', opening.id);
+      else if (opening.offsetMm + opening.widthMm > length + tolerance || opening.sillMm + opening.heightMm > wall.heightMm + tolerance) add('error', 'opening.fit', 'Opening falls outside its host wall.', opening.id);
     }
     for (const stair of model.stairs ?? []) {
       const from = levels.get(stair.fromLevelId); const to = levels.get(stair.toLevelId);
       if (!from || !to) add('error', 'stair.level', 'Stair references an unknown level.', stair.id);
-      else if (stair.riserCount < 1 || to.elevationMm <= from.elevationMm) add('error', 'stair.rise', 'Stair has an invalid rise or riser count.', stair.id);
+      else if (stair.riserCount < 1 || stair.widthMm < 1 || stair.treadDepthMm < 1 || to.elevationMm <= from.elevationMm) add('error', 'stair.rise', 'Stair has an invalid rise, run, width, or riser count.', stair.id);
+      else if (Math.hypot(stair.end.x - stair.start.x, stair.end.y - stair.start.y) + tolerance < (stair.riserCount - 1) * stair.treadDepthMm) add('error', 'stair.run', 'Stair run is too short for its authored tread count and depth.', stair.id);
       else add('warning', 'stair.code', `Concept riser is ${formatLength((to.elevationMm - from.elevationMm) / stair.riserCount)}; code verification remains open.`, stair.id);
     }
     const nodes = new Set((model.systems ?? []).flatMap(system => system.nodes.map(node => node.id)));
     for (const system of model.systems ?? []) {
-      const local = new Set(system.nodes.map(node => node.id));
-      for (const edge of system.edges) if (!local.has(edge.from) || !local.has(edge.to)) add('error', 'system.edge', 'System edge references a node outside its system.', edge.id);
+      const local = new Map(system.nodes.map(node => [node.id, node]));
+      const connected = new Set();
+      for (const node of system.nodes) if (node.levelId && !levels.has(node.levelId)) add('error', 'reference.level', `Unknown level ${node.levelId}.`, node.id);
+      for (const edge of system.edges) {
+        const from = local.get(edge.from), to = local.get(edge.to);
+        if (!from || !to) { add('error', 'system.edge', 'System edge references a node outside its system.', edge.id); continue; }
+        connected.add(from.id); connected.add(to.id);
+        if (!Array.isArray(edge.path) || edge.path.length < 2) { add('error', 'system.path', 'System edge requires at least two path points.', edge.id); continue; }
+        if (!samePoint(edge.path[0], from.position, tolerance) || !samePoint(edge.path.at(-1), to.position, tolerance)) add('error', 'system.endpoint', 'System path endpoints must match their referenced node coordinates.', edge.id);
+      }
+      for (const node of system.nodes) if (!connected.has(node.id)) add('error', 'system.isolated-node', 'System node is not connected by any edge.', node.id);
       if (system.status !== 'concept') add('advisory', 'system.review', `${system.name} remains conceptual.`, system.id);
     }
     for (const object of [...(model.fixtures ?? []), ...(model.equipment ?? [])]) {
       for (const connection of object.connections ?? []) if (!nodes.has(connection)) add('error', 'system.connection', `Unknown system connection ${connection}.`, object.id);
     }
+    for (const dimension of model.dimensions ?? []) if (!dimension.from || !dimension.to || samePoint(dimension.from, dimension.to)) add('error', 'dimension.geometry', 'Dimension endpoints must be distinct model points.', dimension.id);
+    if ((model.sections ?? []).length) add('warning', 'renderer.unsupported-sections', 'Section definitions are preserved for handoff but are not rendered by version 0.1.');
     if (model.project?.jurisdiction?.codeReviewStatus !== 'researched') add('warning', 'code.status', 'Jurisdiction code review is incomplete or unavailable.', model.project?.id);
     return findings;
   }
@@ -288,6 +362,41 @@
     return { x: wall.start.x + dx / length * offset, y: wall.start.y + dy / length * offset };
   }
 
+  function stairSvg(levelId) {
+    const chunks = ['<g data-layer="stairs">'];
+    for (const stair of state.model.stairs.filter(item => item.fromLevelId === levelId)) {
+      const dx = stair.end.x - stair.start.x, dy = stair.end.y - stair.start.y, length = Math.hypot(dx, dy);
+      const nx = -dy / length * stair.widthMm / 2, ny = dx / length * stair.widthMm / 2;
+      const corners = [
+        { x: stair.start.x + nx, y: stair.start.y + ny }, { x: stair.end.x + nx, y: stair.end.y + ny },
+        { x: stair.end.x - nx, y: stair.end.y - ny }, { x: stair.start.x - nx, y: stair.start.y - ny }
+      ];
+      chunks.push(`<g data-entity="${stair.id}"><polygon points="${corners.map(point => `${point.x},${-point.y}`).join(' ')}" fill="#ddd7ca" stroke="#202622" stroke-width="28"/>`);
+      for (let index = 1; index < stair.riserCount; index += 1) {
+        const t = index / stair.riserCount, x = stair.start.x + dx * t, y = stair.start.y + dy * t;
+        chunks.push(`<line x1="${x + nx}" y1="${-(y + ny)}" x2="${x - nx}" y2="${-(y - ny)}" stroke="#69706a" stroke-width="18"/>`);
+      }
+      chunks.push('</g>');
+    }
+    chunks.push('</g>');
+    return chunks.join('');
+  }
+
+  function dimensionSvg(level) {
+    const chunks = ['<g data-layer="dimensions">'];
+    const tolerance = state.model.project.coordinates.toleranceMm ?? 3;
+    for (const dimension of state.model.dimensions ?? []) {
+      if (dimension.kind === 'elevation' || Math.abs(dimension.from.z - level.elevationMm) > tolerance || Math.abs(dimension.to.z - level.elevationMm) > tolerance) continue;
+      const dx = dimension.to.x - dimension.from.x, dy = dimension.to.y - dimension.from.y, length = Math.hypot(dx, dy);
+      const nx = -dy / length, ny = dx / length, offset = dimension.offsetMm ?? 0;
+      const from = { x: dimension.from.x + nx * offset, y: dimension.from.y + ny * offset };
+      const to = { x: dimension.to.x + nx * offset, y: dimension.to.y + ny * offset };
+      chunks.push(`<g data-entity="${dimension.id}"><line class="dimension" x1="${from.x}" y1="${-from.y}" x2="${to.x}" y2="${-to.y}"/><text x="${(from.x + to.x) / 2}" y="${-(from.y + to.y) / 2 - 100}" text-anchor="middle" font-size="200">${escapeHtml(formatLength(length))}</text></g>`);
+    }
+    chunks.push('</g>');
+    return chunks.join('');
+  }
+
   function planSvg(includeSystems) {
     const model = state.model; const bounds = modelBounds(model); const pad = 1500;
     const width = bounds.maxX - bounds.minX; const height = bounds.maxY - bounds.minY;
@@ -308,27 +417,42 @@
       chunks.push(`<g data-entity="${opening.id}"><line class="opening-cut" x1="${start.x}" y1="${-start.y}" x2="${end.x}" y2="${-end.y}" stroke-width="${wall.thicknessMm * 1.45}"/><line class="opening" x1="${start.x}" y1="${-start.y}" x2="${end.x}" y2="${-end.y}" stroke-width="38"/></g>`);
     });
     chunks.push('</g>');
-    if (includeSystems) chunks.push(systemSvg(null));
-    const overallY = -bounds.minY + 820;
-    const overallX = bounds.maxX + 820;
-    chunks.push(`<g data-layer="dimensions"><path class="dimension" d="M${bounds.minX},${overallY}V${overallY + 150}M${bounds.minX},${overallY + 75}H${bounds.maxX}M${bounds.maxX},${overallY}V${overallY + 150}"/><text x="${(bounds.minX + bounds.maxX) / 2}" y="${overallY - 100}" text-anchor="middle" font-size="200">${escapeHtml(formatLength(width))}</text><path class="dimension" d="M${overallX},${-bounds.minY}H${overallX + 150}M${overallX + 75},${-bounds.minY}V${-bounds.maxY}M${overallX},${-bounds.maxY}H${overallX + 150}"/><text x="${overallX + 330}" y="${-(bounds.minY + bounds.maxY) / 2}" transform="rotate(-90 ${overallX + 330} ${-(bounds.minY + bounds.maxY) / 2})" text-anchor="middle" font-size="200">${escapeHtml(formatLength(height))}</text></g>`);
+    chunks.push(stairSvg(state.levelId), dimensionSvg(level));
+    if (includeSystems) chunks.push(systemSvg(state.levelId));
     chunks.push(`<text x="${bounds.minX}" y="${-bounds.maxY - 700}" font-size="250" font-weight="700">${escapeHtml(level?.name ?? '')}</text>`);
     drawing.setAttribute('viewBox', `${bounds.minX - pad} ${-bounds.maxY - pad} ${width + pad * 2} ${height + pad * 2}`);
     return chunks.join('');
   }
 
+  function levelBand(levelId) {
+    const ordered = [...state.model.levels].sort((a, b) => a.elevationMm - b.elevationMm);
+    const index = ordered.findIndex(level => level.id === levelId), level = ordered[index];
+    return { min: level.elevationMm, max: ordered[index + 1]?.elevationMm ?? level.elevationMm + (level.floorToFloorMm ?? 3000) };
+  }
+  function clipSegmentToBand(a, b, band) {
+    const dz = b.z - a.z;
+    if (Math.abs(dz) < 1e-9) return a.z >= band.min && a.z < band.max ? [a, b] : null;
+    const at = t => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + dz * t });
+    const t0 = Math.max(0, Math.min((band.min - a.z) / dz, (band.max - a.z) / dz));
+    const t1 = Math.min(1, Math.max((band.min - a.z) / dz, (band.max - a.z) / dz));
+    return t0 <= t1 ? [at(t0), at(t1)] : null;
+  }
+
   function systemSvg(levelId) {
     const chunks = ['<g data-layer="systems">'];
+    const band = levelId ? levelBand(levelId) : null;
     for (const system of state.model.systems) {
       if (!state.systems.has(system.discipline)) continue;
       const color = COLORS[system.discipline];
       for (const edge of system.edges) {
-        const points = edge.path.filter(point => !levelId || Math.abs(point.z - (state.model.levels.find(level => level.id === levelId)?.elevationMm ?? 0)) < 3400);
-        if (points.length < 2) continue;
-        chunks.push(`<polyline class="system-route" data-entity="${edge.id}" points="${points.map(point => `${point.x},${-point.y}`).join(' ')}" stroke="${color}" opacity=".88"/>`);
+        for (let index = 1; index < edge.path.length; index += 1) {
+          const segment = band ? clipSegmentToBand(edge.path[index - 1], edge.path[index], band) : [edge.path[index - 1], edge.path[index]];
+          if (!segment || samePoint(segment[0], segment[1])) continue;
+          chunks.push(`<line class="system-route" data-entity="${edge.id}" x1="${segment[0].x}" y1="${-segment[0].y}" x2="${segment[1].x}" y2="${-segment[1].y}" stroke="${color}" opacity=".88"/>`);
+        }
       }
       for (const node of system.nodes) {
-        if (levelId && node.levelId && node.levelId !== levelId) continue;
+        if (levelId && (node.levelId ? node.levelId !== levelId : node.position.z < band.min || node.position.z >= band.max)) continue;
         chunks.push(`<circle class="system-node" data-entity="${node.id}" cx="${node.position.x}" cy="${-node.position.y}" r="115" fill="${color}"/>`);
       }
     }
@@ -336,10 +460,21 @@
     return chunks.join('');
   }
 
+  function elevationBasis(side, bounds) {
+    const definitions = {
+      north: { axis: 'y', face: bounds.maxY, project: point => -point.x, label: 'Project North' },
+      south: { axis: 'y', face: bounds.minY, project: point => point.x, label: 'Project South' },
+      east: { axis: 'x', face: bounds.maxX, project: point => point.y, label: 'Project East' },
+      west: { axis: 'x', face: bounds.minX, project: point => -point.y, label: 'Project West' }
+    };
+    return definitions[side];
+  }
+
   function elevationSvg() {
     const model = state.model; const bounds = modelBounds(model); const roof = model.roofs[0];
-    const side = state.elevation; const horizontal = side === 'north' || side === 'south' ? 'x' : 'y';
-    const minH = horizontal === 'x' ? bounds.minX : bounds.minY; const maxH = horizontal === 'x' ? bounds.maxX : bounds.maxY;
+    const side = state.elevation; const basis = elevationBasis(side, bounds);
+    const projected = [{ x: bounds.minX, y: bounds.minY }, { x: bounds.maxX, y: bounds.minY }, { x: bounds.maxX, y: bounds.maxY }, { x: bounds.minX, y: bounds.maxY }].map(basis.project);
+    const overhang = roof?.overhangMm ?? 0, minH = Math.min(...projected) - overhang, maxH = Math.max(...projected) + overhang;
     const gable = (side === 'north' || side === 'south') ? roof?.ridgeAxis === 'y' : roof?.ridgeAxis === 'x';
     const maxZ = roof?.ridgeElevationMm ?? Math.max(...model.levels.map(level => level.elevationMm + (level.floorToFloorMm ?? 3000)));
     const eave = roof?.eaveElevationMm ?? maxZ;
@@ -349,16 +484,13 @@
     const chunks = [`<polygon points="${silhouette}" fill="#e7e5dc" stroke="#202622" stroke-width="40"/>`];
     const isVisibleWall = wall => {
       const epsilon = 3;
-      if (side === 'north') return Math.abs(wall.start.y - bounds.minY) < epsilon && Math.abs(wall.end.y - bounds.minY) < epsilon;
-      if (side === 'south') return Math.abs(wall.start.y - bounds.maxY) < epsilon && Math.abs(wall.end.y - bounds.maxY) < epsilon;
-      if (side === 'east') return Math.abs(wall.start.x - bounds.maxX) < epsilon && Math.abs(wall.end.x - bounds.maxX) < epsilon;
-      return Math.abs(wall.start.x - bounds.minX) < epsilon && Math.abs(wall.end.x - bounds.minX) < epsilon;
+      return Math.abs(wall.start[basis.axis] - basis.face) < epsilon && Math.abs(wall.end[basis.axis] - basis.face) < epsilon;
     };
     for (const opening of model.openings) {
       const wall = model.walls.find(item => item.id === opening.wallId); if (!wall || !isVisibleWall(wall)) continue;
       const level = model.levels.find(item => item.id === wall.levelId); const p0 = pointAlongWall(wall, opening.offsetMm); const p1 = pointAlongWall(wall, opening.offsetMm + opening.widthMm);
-      const h0 = horizontal === 'x' ? p0.x : p0.y; const h1 = horizontal === 'x' ? p1.x : p1.y;
-      const left = Math.min(h0, h1); const width = Math.abs(h1 - h0); const bottom = (level?.elevationMm ?? 0) + opening.sillMm;
+      const h0 = basis.project(p0), h1 = basis.project(p1);
+      const left = Math.min(h0, h1); const width = Math.abs(h1 - h0); const bottom = (level?.elevationMm ?? 0) + (wall.baseOffsetMm ?? 0) + opening.sillMm;
       chunks.push(`<g data-entity="${opening.id}"><rect x="${left}" y="${-(bottom + opening.heightMm)}" width="${width}" height="${opening.heightMm}" fill="${opening.kind === 'window' ? '#b9d4dd' : '#f6f1e6'}" stroke="#202622" stroke-width="28"/><text x="${left + width / 2}" y="${-(bottom + opening.heightMm / 2)}" text-anchor="middle" font-size="160">${escapeHtml(opening.kind)}</text></g>`);
     }
     for (const level of model.levels) chunks.push(`<path d="M${minH - 700},${-level.elevationMm}H${maxH + 700}" stroke="#8c918b" stroke-width="15" stroke-dasharray="110 75"/><text x="${minH - 760}" y="${-level.elevationMm - 70}" text-anchor="end" font-size="150">${escapeHtml(level.name)} · ${escapeHtml(formatLength(level.elevationMm))}</text>`);
@@ -372,7 +504,11 @@
       return;
     }
     const jurisdiction = state.model.project.jurisdiction;
-    content.innerHTML = `<div class="page"><span class="kicker">Advisory code review</span><h1>No compliance claim without evidence.</h1><p>This model targets ${escapeHtml([jurisdiction.locality, jurisdiction.county, jurisdiction.stateOrRegion, jurisdiction.country].filter(Boolean).join(', '))}. Its code review status is <strong>${escapeHtml(jurisdiction.codeReviewStatus)}</strong>.</p><h2>Coverage</h2><div class="empty">No cited code findings were staged with this model. Research adopted codes and local amendments from official sources, or attach source documents. Until then, stairs, egress, accessibility, setbacks, equipment clearances, fire separation, and occupancy assumptions remain unresolved.</div><h2>Required output</h2><p>Code findings must record issuing authority, title, edition or adoption date, source URL or document, accessed date, applicability, affected model entities, confidence, and review status. Never report this concept as “code compliant.”</p><div class="disclaimer">Advisory only. Confirm interpretations with the authority having jurisdiction and licensed professionals.</div></div>`;
+    const report = state.codeReport;
+    const reportBody = report.status === 'loaded'
+      ? `<h2>Findings</h2>${report.data.findings.map(finding => `<article class="finding ${finding.status === 'needs-review' ? 'warning' : ''}" data-select="${escapeHtml(finding.affectedEntityIds[0] ?? '')}"><b>${escapeHtml(finding.status)} · ${escapeHtml(finding.topic)}</b><span>${escapeHtml(finding.summary)} — ${escapeHtml(finding.authority)}, ${escapeHtml(finding.sourceTitle)} (${escapeHtml(finding.sourceRef)}; accessed ${escapeHtml(finding.accessedDate)})</span></article>`).join('') || '<div class="empty">The report contains no findings.</div>'}<h2>Coverage</h2><table><tbody>${Object.entries(report.data.coverage).map(([key, values]) => `<tr><th>${escapeHtml(key)}</th><td>${escapeHtml(values.join('; ') || 'None recorded')}</td></tr>`).join('')}</tbody></table>`
+      : `<h2>Coverage</h2><div class="empty">${escapeHtml(report.message)} Research adopted codes and local amendments from official sources, or attach source documents. Until then, all code-sensitive decisions remain unresolved.</div>`;
+    content.innerHTML = `<div class="page"><span class="kicker">Advisory code review</span><h1>No compliance claim without evidence.</h1><p>This model targets ${escapeHtml([jurisdiction.locality, jurisdiction.county, jurisdiction.stateOrRegion, jurisdiction.country].filter(Boolean).join(', '))}. Its code review status is <strong>${escapeHtml(jurisdiction.codeReviewStatus)}</strong>.</p>${reportBody}<div class="disclaimer">Advisory only. Confirm interpretations with the authority having jurisdiction and licensed professionals.</div></div>`;
   }
 
   function selectedEntity() {
@@ -410,7 +546,7 @@
     const c = Math.cos(angle), s = Math.sin(angle), hx = length / 2, hy = height / 2, hz = depth / 2;
     const local = [[-hx,-hy,-hz],[hx,-hy,-hz],[hx,hy,-hz],[-hx,hy,-hz],[-hx,-hy,hz],[hx,-hy,hz],[hx,hy,hz],[-hx,hy,hz]];
     const points = local.map(([x,y,z]) => [cx + x*c - z*s, cy + y, cz + x*s + z*c]);
-    const faces = [[0,1,2,0,2,3],[5,4,7,5,7,6],[4,0,3,4,3,7],[1,5,6,1,6,2],[3,2,6,3,6,7],[4,5,1,4,1,0]];
+    const faces = [[0,2,1,0,3,2],[5,7,4,5,6,7],[4,3,0,4,7,3],[1,6,5,1,2,6],[3,6,2,3,7,6],[4,1,5,4,0,1]];
     faces.flat().forEach(index => target.push(...points[index], ...color));
   }
 
@@ -421,8 +557,8 @@
     gls.triangles.length = 0; gls.lines.length = 0; const model = state.model;
     const levelMap = new Map(model.levels.map(level => [level.id, level]));
     for (const slab of model.slabs) {
-      const level = levelMap.get(slab.levelId); const xs = slab.boundary.map(p => p.x); const ys = slab.boundary.map(p => p.y);
-      pushPrism(gls.triangles, (Math.min(...xs)+Math.max(...xs))/2000, ((level?.elevationMm ?? 0)-slab.thicknessMm/2)/1000, -(Math.min(...ys)+Math.max(...ys))/2000, (Math.max(...xs)-Math.min(...xs))/1000, slab.thicknessMm/1000, (Math.max(...ys)-Math.min(...ys))/1000, 0, rgb('#b9b8b0'));
+      const level = levelMap.get(slab.levelId); const bounds = rectangleBounds(slab.boundary);
+      pushPrism(gls.triangles, (bounds.minX+bounds.maxX)/2000, ((level?.elevationMm ?? 0)-slab.thicknessMm/2)/1000, -(bounds.minY+bounds.maxY)/2000, (bounds.maxX-bounds.minX)/1000, slab.thicknessMm/1000, (bounds.maxY-bounds.minY)/1000, 0, rgb('#b9b8b0'));
     }
     for (const wall of model.walls) {
       const level = levelMap.get(wall.levelId); const length = Math.hypot(wall.end.x-wall.start.x,wall.end.y-wall.start.y); const openings = model.openings.filter(item => item.wallId === wall.id).sort((a,b)=>a.offsetMm-b.offsetMm);
@@ -434,8 +570,16 @@
       const color = object.kind.includes('panel') ? '#b64b34' : object.kind.includes('heat') ? '#187773' : '#d69d43';
       pushPrism(gls.triangles, object.position.x/1000, (object.position.z+object.size.z/2)/1000, -object.position.y/1000, object.size.x/1000, object.size.z/1000, object.size.y/1000, -object.rotationDeg*Math.PI/180, rgb(color));
     }
+    for (const stair of model.stairs) {
+      const from = levelMap.get(stair.fromLevelId), to = levelMap.get(stair.toLevelId);
+      const dx = stair.end.x - stair.start.x, dy = stair.end.y - stair.start.y, run = Math.hypot(dx, dy), angle = Math.atan2(-dy, dx);
+      for (let index = 0; index < stair.riserCount; index += 1) {
+        const t = (index + .5) / stair.riserCount, height = (to.elevationMm - from.elevationMm) * (index + 1) / stair.riserCount;
+        pushPrism(gls.triangles, (stair.start.x + dx * t) / 1000, (from.elevationMm + height / 2) / 1000, -(stair.start.y + dy * t) / 1000, run / stair.riserCount / 1000, height / 1000, stair.widthMm / 1000, angle, rgb('#9b8b76'));
+      }
+    }
     for (const roof of model.roofs) {
-      const xs=roof.footprint.map(p=>p.x), ys=roof.footprint.map(p=>p.y), minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+      const bounds=rectangleBounds(roof.footprint), overhang=roof.overhangMm??0, minX=bounds.minX-overhang,maxX=bounds.maxX+overhang,minY=bounds.minY-overhang,maxY=bounds.maxY+overhang;
       const lineColor=rgb('#7a6650'); [[minX,minY],[maxX,minY],[maxX,maxY],[minX,maxY],[minX,minY]].slice(0,-1).forEach((p,i)=>pushLine(gls.lines,worldPoint({x:p[0],y:p[1],z:roof.eaveElevationMm}),worldPoint({x:[[minX,minY],[maxX,minY],[maxX,maxY],[minX,maxY],[minX,minY]][i+1][0],y:[[minX,minY],[maxX,minY],[maxX,maxY],[minX,maxY],[minX,minY]][i+1][1],z:roof.eaveElevationMm}),lineColor));
       const mid=roof.ridgeAxis==='y'?(minX+maxX)/2:(minY+maxY)/2; const a=roof.ridgeAxis==='y'?{x:mid,y:minY,z:roof.ridgeElevationMm}:{x:minX,y:mid,z:roof.ridgeElevationMm}; const b=roof.ridgeAxis==='y'?{x:mid,y:maxY,z:roof.ridgeElevationMm}:{x:maxX,y:mid,z:roof.ridgeElevationMm}; pushLine(gls.lines,worldPoint(a),worldPoint(b),lineColor);
     }
@@ -472,7 +616,7 @@
     levelControl.classList.toggle('hidden-view',!['plan','systems'].includes(state.view)); elevationControl.classList.toggle('hidden-view',state.view!=='elevation'); document.querySelectorAll('#mode-orbit,#mode-walk').forEach(el=>el.classList.toggle('hidden',state.view!=='model')); document.querySelectorAll('.system-toggle').forEach(el=>el.classList.toggle('hidden',!['systems','model'].includes(state.view)));
     if(state.view==='plan'){drawing.innerHTML=planSvg(false);viewName.textContent='Plan';viewDetail.textContent='Dimensions and openings derived from the active model';}
     if(state.view==='systems'){drawing.innerHTML=planSvg(true);viewName.textContent='Systems coordination';viewDetail.textContent='Concept routes · sizing and loads unresolved';}
-    if(state.view==='elevation'){drawing.innerHTML=elevationSvg();viewName.textContent=`${state.elevation[0].toUpperCase()+state.elevation.slice(1)} Elevation`;viewDetail.textContent='Orthographic projection from wall, opening, level, and roof entities';}
+    if(state.view==='elevation'){drawing.innerHTML=elevationSvg();const basis=elevationBasis(state.elevation,modelBounds(state.model));viewName.textContent=`${basis.label} Elevation`;viewDetail.textContent=`Project-axis view · true north is ${state.model.project.coordinates.trueNorthDeg}° clockwise from +Y`;}
     if(state.view==='model'){viewName.textContent='Interactive model';viewDetail.textContent=state.cameraMode==='walk'?'Walk mode · no construction tolerances implied':'Orbit mode · shared model coordinates';if(glState)buildScene(glState);requestAnimationFrame(renderWebGL);}
     if(isDocument){renderDocument(state.view);viewName.textContent=state.view==='code'?'Code review':'Assumptions';viewDetail.textContent='Professional handoff evidence';}
     drawing.querySelectorAll('[data-entity]').forEach(el=>{if(el.dataset.entity===state.selected)el.classList.add('selected');el.addEventListener('click',()=>{state.selected=el.dataset.entity;render();});});
@@ -493,12 +637,27 @@
       const params=new URLSearchParams(location.search); const modelPath=params.get('model')||'./models/building.json'; const response=await fetch(modelPath,{cache:'no-store'}); if(!response.ok)throw new Error(`Model request failed: ${response.status}`); state.model=await response.json();
       const requestedView=params.get('view'); if(['plan','elevation','model','systems','code','assumptions'].includes(requestedView))state.view=requestedView;
       const requestedLevel=params.get('level'); state.levelId=state.model.levels.some(level=>level.id===requestedLevel)?requestedLevel:(state.model.levels[0]?.id??null); state.findings=validateModel(state.model);
-      document.querySelector('#project-name').textContent=state.model.project.name; document.querySelector('#project-meta').textContent=`${state.model.project.status} · ${state.model.project.coordinates.displayUnits}`; levelSelect.innerHTML=state.model.levels.map(level=>`<option value="${escapeHtml(level.id)}"${level.id===state.levelId?' selected':''}>${escapeHtml(level.name)}</option>`).join(''); document.querySelectorAll('.tab').forEach(tab=>tab.setAttribute('aria-selected',String(tab.dataset.view===state.view))); wireControls(); render();
+      const codePath=params.get('code')||'./reviews/code-findings.json';
+      try {
+        const codeResponse=await fetch(codePath,{cache:'no-store'});
+        if(codeResponse.ok) {
+          const data=await codeResponse.json();
+          const valid=data?.schemaVersion==='1.0.0'&&data.projectId===state.model.project.id&&Array.isArray(data.findings)&&data.coverage&&['researched','needs-review','unavailable'].includes(data.status);
+          state.codeReport=valid?{status:'loaded',data}:{status:'invalid',message:'The advisory code report is malformed or belongs to another project.'};
+        } else if(codeResponse.status!==404) state.codeReport={status:'invalid',message:`The advisory code report request failed with status ${codeResponse.status}.`};
+      } catch(error) {
+        state.codeReport={status:'invalid',message:`The advisory code report could not be read: ${error instanceof Error?error.message:String(error)}`};
+      }
+      document.querySelector('#project-name').textContent=state.model.project.name; document.querySelector('#project-meta').textContent=`${state.model.project.status} · ${state.model.project.coordinates.displayUnits}`;
+      if(state.findings.some(item=>item.severity==='error')) { renderInspector(); return; }
+      levelSelect.innerHTML=state.model.levels.map(level=>`<option value="${escapeHtml(level.id)}"${level.id===state.levelId?' selected':''}>${escapeHtml(level.name)}</option>`).join(''); document.querySelectorAll('.tab').forEach(tab=>tab.setAttribute('aria-selected',String(tab.dataset.view===state.view))); wireControls(); render();
     } catch(error) {
       inspector.innerHTML=`<span class="kicker">Load error</span><h2>Model unavailable</h2><p class="lede">${escapeHtml(error instanceof Error?error.message:String(error))}</p><div class="disclaimer">Expected a schema-valid model at <code>models/building.json</code>. The studio will not invent fallback geometry.</div>`;
     }
   }
-  start();
+  const testApi = { state, validateModel, planSvg, elevationSvg, systemSvg, buildScene, pushPrism, rectangleBounds, renderDocument };
+  if (typeof globalThis.__OD_STUDIO_TEST__ === 'function') globalThis.__OD_STUDIO_TEST__(testApi);
+  else start();
 })();
 </script>
 </body>
