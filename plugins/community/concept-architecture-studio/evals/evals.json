@@ -1,0 +1,47 @@
+{
+  "skill_name": "concept-architecture-studio",
+  "evals": [
+    {
+      "id": "text-brief-two-level-studio",
+      "prompt": "Create a two-level 36 by 48 foot workshop residence in upstate New York. Put a fabrication shop below, a two-bedroom home above, and include conceptual plumbing, electrical, HVAC, plans, elevations, one section, and a walkthrough.",
+      "expected_output": "A schema-valid coordinate model and professional concept handoff whose 2D and 3D views agree.",
+      "assertions": [
+        "The result writes one active models/building.json source of truth",
+        "Plans, elevations, sections, systems, and 3D derive from the same stable entity IDs",
+        "The code review cites official jurisdiction sources or reports unavailable",
+        "MEP routes are conceptual and disclose unresolved sizing and loads",
+        "The handoff rejects permit-ready and code-compliant claims"
+      ]
+    },
+    {
+      "id": "calibrated-sketch",
+      "prompt": "Turn my attached hand sketch into a concept model. The dimension marked across the front wall is exactly 9.6 meters. Do not assume any other dimensions without marking them for review.",
+      "expected_output": "A calibrated model that distinguishes measured and inferred geometry.",
+      "assertions": [
+        "The trusted calibration dimension is recorded in evidence metadata",
+        "Inferred values use heuristic or generated provenance and needs-review status",
+        "No legal boundary or setback is inferred from imagery"
+      ]
+    },
+    {
+      "id": "code-source-unavailable",
+      "prompt": "Develop a small rural cabin concept, but do not use the network and I have not supplied local code documents.",
+      "expected_output": "A concept package with code research explicitly unavailable.",
+      "assertions": [
+        "codeReviewStatus is unavailable",
+        "No numeric code rule is invented from memory",
+        "The handoff lists jurisdiction and occupancy questions for the architect or code official"
+      ]
+    },
+    {
+      "id": "cross-view-opening-consistency",
+      "prompt": "Using the supplied concept model, move the north great-room window 600 mm east and regenerate every view.",
+      "expected_output": "One model edit reflected in plan, elevation, section, and 3D.",
+      "assertions": [
+        "Only the canonical opening offset changes",
+        "Every derived view resolves the same opening ID and new offset",
+        "No renderer-local opening coordinate is introduced"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Concept Architecture Studio Preview</title>
+<style>
+  :root { --paper:#f2eee4;--sheet:#fbfaf6;--ink:#202622;--muted:#69706a;--line:#c8c6bc;--accent:#b64b34;--blue:#315fa3;--teal:#187773;--serif:"Iowan Old Style",Georgia,serif;--mono:"Cascadia Mono",Consolas,monospace; }
+  *{box-sizing:border-box}html,body{height:100%;margin:0}body{background:var(--paper);color:var(--ink);font:14px/1.4 "Segoe UI",sans-serif;overflow:hidden}
+  .app{display:grid;grid-template-columns:minmax(0,1fr) 280px;height:100%}.main{display:grid;grid-template-rows:52px minmax(0,1fr);min-width:0}
+  header{display:flex;align-items:center;padding:0 20px;border-bottom:1px solid var(--line);background:var(--sheet)}header strong{font:600 17px/1 var(--serif)}header span{margin-left:auto;color:var(--muted);font:9px/1.4 var(--mono);text-transform:uppercase}
+  .stage{position:relative;background:var(--sheet);overflow:hidden}.stage:before{content:"";position:absolute;inset:0;background-image:linear-gradient(#e3e0d7 1px,transparent 1px),linear-gradient(90deg,#e3e0d7 1px,transparent 1px);background-size:24px 24px;opacity:.55}
+  svg{position:absolute;inset:7% 8%;width:84%;height:86%}.room{fill:#ece8dd;stroke:#b7b7ad;stroke-width:18}.room.wet{fill:#dfeae5}.wall{fill:none;stroke:var(--ink);stroke-width:110;stroke-linejoin:miter}.opening{fill:none;stroke:var(--accent);stroke-width:22}.pipe{fill:none;stroke:var(--blue);stroke-width:34;stroke-linejoin:round}.duct{fill:none;stroke:var(--teal);stroke-width:34;stroke-linejoin:round;stroke-dasharray:110 45}.node{stroke:var(--sheet);stroke-width:16}.label{font:600 230px/1 var(--mono);fill:var(--ink);text-anchor:middle}.sub{font:180px/1 var(--mono);fill:var(--muted);text-anchor:middle}
+  aside{min-width:0;border-left:1px solid var(--line);background:#e7e3d8;padding:22px;overflow:auto}.k{color:var(--accent);font:600 9px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase}h1{overflow-wrap:anywhere;font:600 29px/1 var(--serif);margin:10px 0 12px}p{color:#565c57;font-size:12px}.metrics{display:grid;grid-template-columns:1fr auto;gap:8px;margin:20px 0;padding:16px 0;border-block:1px solid var(--line);font:10px/1.2 var(--mono);text-transform:uppercase}.metrics b{text-align:right}.finding{margin-top:9px;padding:9px;border-left:3px solid #a86c18;background:rgba(255,255,255,.48);font-size:11px}.notice{margin-top:18px;padding:11px;border:1px solid #c5a575;background:#f8edd8;color:#654c25;font-size:11px}
+  .tabs{position:absolute;left:18px;top:16px;display:flex;gap:1px}.tabs span{padding:7px 10px;background:var(--sheet);border:1px solid var(--line);font:9px/1 var(--mono);text-transform:uppercase}.tabs .on{background:var(--ink);color:var(--sheet)}
+  @media(max-width:720px){body{overflow:auto}.app{display:block;width:100%;height:auto;min-height:100%;overflow-x:hidden}.main{height:58vh}header span{display:none}aside{width:100%;max-width:100%;overflow-x:hidden;border-left:0;border-top:1px solid var(--line);padding:16px}aside>*{max-width:100%}aside h1{font-size:25px;word-break:normal}aside p{overflow-wrap:anywhere}.metrics{margin:12px 0}.notice{margin-top:10px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="main">
+    <header><strong>Concept Architecture Studio</strong><span>One model · every view</span></header>
+    <div class="stage">
+      <div class="tabs"><span class="on">Plan</span><span>Elevations</span><span>3D</span><span>Systems</span></div>
+      <svg viewBox="-900 -900 11400 15000" aria-label="Synthetic barn residence concept plan with system routes">
+        <rect class="room" x="0" y="0" width="9600" height="9000"/><rect class="room wet" x="0" y="9000" width="3600" height="4200"/><rect class="room" x="3600" y="9000" width="6000" height="4200"/>
+        <path class="wall" d="M0 0H9600V13200H0ZM0 9000H9600M3600 9000V13200"/>
+        <path class="opening" d="M700 0H3900M5000 0H8200M9600 10300V11300M4100 9000H5100"/>
+        <polyline class="pipe" points="0,10800 3300,10800 3300,10100 900,10100 900,9800"/><polyline class="duct" points="0,10800 1800,10800 1800,4500 4800,4500"/>
+        <circle class="node" cx="3300" cy="10100" r="120" fill="var(--blue)"/><circle class="node" cx="1800" cy="10800" r="120" fill="var(--teal)"/>
+        <text class="label" x="4800" y="4300">WORKSHOP</text><text class="sub" x="4800" y="4680">9.6 × 9.0 m</text><text class="label" x="1800" y="11000">UTILITY</text><text class="sub" x="1800" y="11380">wet + service core</text><text class="label" x="6600" y="11000">ENTRY + STAIR</text>
+        <path d="M0 13850H9600M0 13680V14020M9600 13680V14020" stroke="var(--muted)" stroke-width="18"/><text class="sub" x="4800" y="14300">31′-06″</text>
+      </svg>
+    </div>
+  </section>
+  <aside><span class="k">Model diagnostics</span><h1>Internally consistent concept</h1><p>Plans, elevations, system routes, dimensions, and the walkthrough resolve the same stable coordinates.</p><div class="metrics"><span>Levels</span><b>2</b><span>Spaces</span><b>6</b><span>Systems</span><b>3</b><span>Code review</span><b>Needs review</b></div><span class="k">Priority findings</span><div class="finding"><b>Stair geometry</b><br>Headroom, guards, and adopted-code parameters remain unresolved.</div><div class="finding"><b>MEP sizing</b><br>Routes coordinate space only; loads, slopes, and capacities require engineering.</div><div class="notice">Concept only. Not a survey, permit set, engineering design, or construction document.</div></aside>
+</div>
+</body>
+</html>

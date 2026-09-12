@@ -1,0 +1,160 @@
+{
+  "$schema": "https://open-design.ai/schemas/plugin.v1.json",
+  "specVersion": "1.0.0",
+  "name": "concept-architecture-studio",
+  "title": "Concept Architecture Studio",
+  "version": "0.1.0",
+  "description": "Explore close-to-accurate building concepts through one coordinate model that drives plans, elevations, sections, conceptual MEP systems, advisory code review, and a 3D walkthrough.",
+  "license": "MIT",
+  "author": {
+    "name": "OpenDesign Community",
+    "url": "https://open-design.ai/marketplace/community"
+  },
+  "homepage": "https://github.com/nexu-io/open-design/tree/main/plugins/community/concept-architecture-studio",
+  "tags": [
+    "community",
+    "architecture",
+    "floor-plan",
+    "elevation",
+    "3d",
+    "mep",
+    "building-code",
+    "concept-design"
+  ],
+  "compat": {
+    "agentSkills": [
+      {
+        "path": "./SKILL.md"
+      }
+    ]
+  },
+  "od": {
+    "kind": "scenario",
+    "taskKind": "new-generation",
+    "mode": "prototype",
+    "platform": "desktop",
+    "scenario": "architecture",
+    "preview": {
+      "type": "html",
+      "entry": "./preview/index.html",
+      "motion": "static"
+    },
+    "useCase": {
+      "query": {
+        "en": "Develop a close-to-accurate concept architecture package for {{project_name}} in {{jurisdiction}}. Program: {{building_program}}. Target approximately {{area}} across {{levels}} level(s), using {{display_units}}. Produce one coordinate-driven model, plans, elevations, sections, conceptual MEP placement and routes, an advisory cited code review, and an interactive 3D walkthrough."
+      }
+    },
+    "context": {
+      "skills": [
+        {
+          "path": "./SKILL.md"
+        }
+      ],
+      "assets": [
+        "./assets/studio-template.html",
+        "./references/building.schema.json",
+        "./references/coordinate-contract.md",
+        "./references/model-validation.md",
+        "./references/mep-concept-rules.md",
+        "./references/code-research.md",
+        "./references/code-findings.schema.json",
+        "./references/checklist.md",
+        "./examples/lakeside-barn-residence/building.json"
+      ],
+      "atoms": [
+        "discovery-question-form",
+        "todo-write",
+        "critique-theater",
+        "handoff"
+      ]
+    },
+    "pipeline": {
+      "stages": [
+        {
+          "id": "discovery",
+          "atoms": [
+            "discovery-question-form"
+          ]
+        },
+        {
+          "id": "plan",
+          "atoms": [
+            "todo-write"
+          ]
+        },
+        {
+          "id": "generate",
+          "atoms": [
+            "file-write",
+            "live-artifact"
+          ]
+        },
+        {
+          "id": "critique",
+          "atoms": [
+            "critique-theater"
+          ]
+        },
+        {
+          "id": "handoff",
+          "atoms": [
+            "handoff"
+          ]
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "name": "project_name",
+        "type": "string",
+        "required": true,
+        "label": "Project name",
+        "default": "Untitled building concept"
+      },
+      {
+        "name": "jurisdiction",
+        "type": "string",
+        "required": true,
+        "label": "Project jurisdiction",
+        "placeholder": "City, county, state, country"
+      },
+      {
+        "name": "building_program",
+        "type": "text",
+        "required": true,
+        "label": "Building program",
+        "placeholder": "Uses, rooms, occupants, vehicles, equipment, and priorities"
+      },
+      {
+        "name": "area",
+        "type": "string",
+        "label": "Approximate area",
+        "default": "to be established from the brief"
+      },
+      {
+        "name": "levels",
+        "type": "number",
+        "required": true,
+        "label": "Levels",
+        "default": 1
+      },
+      {
+        "name": "display_units",
+        "type": "select",
+        "required": true,
+        "label": "Display units",
+        "options": [
+          "feet-inches",
+          "metric"
+        ],
+        "default": "feet-inches"
+      }
+    ],
+    "capabilities": [
+      "prompt:inject",
+      "fs:read",
+      "fs:write",
+      "network"
+    ]
+  }
+}

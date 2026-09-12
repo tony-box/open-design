@@ -1,0 +1,13 @@
+{
+  "skill_name": "concept-architecture-studio",
+  "queries": [
+    { "query": "Design a concept floor plan, elevations, MEP layout, and 3D walkthrough for a barn house", "should_trigger": true },
+    { "query": "Help me compare two architectural layouts before I hire an architect", "should_trigger": true },
+    { "query": "Create a coordinate-driven concept model from this measured building sketch", "should_trigger": true },
+    { "query": "Check my concept stair and egress ideas against cited local building-code sources", "should_trigger": true },
+    { "query": "Generate a photorealistic image of a modern house", "should_trigger": false },
+    { "query": "Produce stamped structural calculations for a roof truss", "should_trigger": false },
+    { "query": "Write permit-ready electrical construction drawings", "should_trigger": false },
+    { "query": "Make a SaaS dashboard prototype", "should_trigger": false }
+  ]
+}

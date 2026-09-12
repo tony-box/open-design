@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Concept Architecture Studio</title>
+<style>
+  :root {
+    --paper: #f3f0e8;
+    --sheet: #fbfaf6;
+    --ink: #202622;
+    --muted: #69706a;
+    --line: #c9c8bf;
+    --line-strong: #8c918b;
+    --accent: #b64b34;
+    --teal: #187773;
+    --blue: #315fa3;
+    --amber: #a86c18;
+    --panel: #e8e4da;
+    --error: #a22e2e;
+    --warning: #95620d;
+    --advisory: #496069;
+    --sans: "Aptos", "Segoe UI", sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+  body { background: var(--paper); color: var(--ink); font: 14px/1.45 var(--sans); }
+  button, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  .app { display: grid; grid-template-rows: 58px 1fr; width: 100%; min-width: 0; height: 100%; overflow-x: hidden; }
+  header {
+    display: flex; align-items: stretch; min-width: 0;
+    border-bottom: 1px solid var(--line); background: var(--sheet);
+  }
+  .brand { width: 264px; padding: 9px 18px; border-right: 1px solid var(--line); }
+  .brand strong { display: block; overflow: hidden; font: 600 16px/1.15 var(--serif); text-overflow: ellipsis; white-space: nowrap; }
+  .brand span { color: var(--muted); font: 10px/1.4 var(--mono); text-transform: uppercase; }
+  nav { display: flex; min-width: 0; overflow-x: auto; }
+  .tab {
+    min-width: 94px; padding: 0 15px; border: 0; border-right: 1px solid var(--line);
+    background: transparent; color: var(--muted); font: 600 10px/1 var(--mono);
+    letter-spacing: .07em; text-transform: uppercase; position: relative;
+  }
+  .tab:hover { color: var(--ink); background: #f2efe7; }
+  .tab[aria-selected="true"] { color: var(--ink); background: var(--paper); }
+  .tab[aria-selected="true"]::after { content: ""; position: absolute; inset: auto 0 -1px; height: 3px; background: var(--accent); }
+  .status { margin-left: auto; display: flex; align-items: center; gap: 10px; padding: 0 18px; white-space: nowrap; }
+  .status i { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); }
+  .status span { font: 10px/1.3 var(--mono); color: var(--muted); text-transform: uppercase; }
+  .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 330px; min-height: 0; }
+  .stage { display: grid; grid-template-rows: 48px minmax(0, 1fr); min-width: 0; min-height: 0; }
+  .toolbar {
+    display: flex; align-items: center; gap: 8px; padding: 0 14px;
+    border-bottom: 1px solid var(--line); background: var(--paper); overflow-x: auto;
+  }
+  .toolbar label { display: flex; align-items: center; gap: 7px; color: var(--muted); font: 10px/1 var(--mono); text-transform: uppercase; }
+  select, .tool {
+    min-height: 30px; border: 1px solid var(--line); border-radius: 3px;
+    background: var(--sheet); padding: 0 9px; font: 11px/1 var(--mono);
+  }
+  .tool[aria-pressed="true"] { color: var(--sheet); background: var(--ink); border-color: var(--ink); }
+  .tool:hover, select:hover { border-color: var(--line-strong); }
+  .tool.hidden { display: none; }
+  .canvas-wrap { position: relative; min-height: 0; overflow: hidden; background: var(--sheet); }
+  .canvas-wrap::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .45;
+    background-image: linear-gradient(#dedcd4 1px, transparent 1px), linear-gradient(90deg, #dedcd4 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  #drawing, #model3d { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #drawing { z-index: 1; }
+  #model3d { z-index: 2; background: #dfe6e2; }
+  #content { position: absolute; inset: 0; z-index: 3; overflow: auto; padding: 34px clamp(24px, 5vw, 72px); background: var(--sheet); }
+  .hidden-view { display: none !important; }
+  .view-title { position: absolute; left: 18px; bottom: 18px; z-index: 5; pointer-events: none; }
+  .view-title strong { display: block; font: 600 18px/1.1 var(--serif); }
+  .view-title span { color: var(--muted); font: 10px/1.4 var(--mono); text-transform: uppercase; }
+  .model-help { position: absolute; right: 18px; bottom: 18px; z-index: 5; padding: 8px 10px; background: rgba(251,250,246,.9); border: 1px solid var(--line); font: 10px/1.5 var(--mono); color: var(--muted); }
+  aside { min-width: 0; min-height: 0; border-left: 1px solid var(--line); background: var(--panel); overflow-y: auto; }
+  .inspector { min-width: 0; padding: 20px; overflow-wrap: anywhere; }
+  .kicker { color: var(--accent); font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+  h1, h2, h3, p { margin-top: 0; }
+  .inspector h2 { margin: 8px 0 10px; font: 600 24px/1.08 var(--serif); }
+  .inspector .lede { color: #515851; font-size: 13px; }
+  .rule { height: 1px; margin: 20px 0; background: var(--line); }
+  .metric { display: grid; grid-template-columns: 1fr auto; gap: 7px 14px; }
+  .metric dt { color: var(--muted); font: 10px/1.35 var(--mono); text-transform: uppercase; }
+  .metric dd { margin: 0; font: 600 12px/1.35 var(--mono); text-align: right; }
+  .diagnostics { display: grid; gap: 8px; margin-top: 11px; }
+  .finding { border-left: 3px solid var(--advisory); background: rgba(255,255,255,.48); padding: 9px 10px; }
+  .finding.error { border-color: var(--error); }
+  .finding.warning { border-color: var(--warning); }
+  .finding b { display: block; font: 600 10px/1.2 var(--mono); text-transform: uppercase; }
+  .finding span { display: block; margin-top: 4px; color: #555d57; font-size: 12px; }
+  .disclaimer { margin-top: 18px; border: 1px solid #c8a97a; background: #f7edda; padding: 11px; color: #624b24; font-size: 12px; }
+  .page { max-width: 920px; margin: 0 auto; }
+  .page h1 { font: 600 clamp(32px, 5vw, 58px)/.98 var(--serif); max-width: 14ch; }
+  .page h2 { margin: 34px 0 12px; font: 600 22px/1.1 var(--serif); }
+  .page p { color: #505751; max-width: 72ch; }
+  .page table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+  .page th, .page td { border-bottom: 1px solid var(--line); padding: 10px 8px; text-align: left; vertical-align: top; }
+  .page th { color: var(--muted); font: 600 10px/1 var(--mono); text-transform: uppercase; }
+  .empty { border: 1px dashed var(--line-strong); padding: 22px; color: var(--muted); }
+  .route-legend { margin-left: auto; display: flex; gap: 12px; white-space: nowrap; }
+  .route-legend span { font: 10px/1 var(--mono); color: var(--muted); text-transform: uppercase; }
+  .route-legend i { display: inline-block; width: 18px; border-top: 3px solid; margin-right: 5px; vertical-align: 3px; }
+  .route-legend .plumbing { color: var(--blue); }
+  .route-legend .electrical { color: var(--accent); }
+  .route-legend .mechanical { color: var(--teal); }
+  svg text { font-family: var(--mono); fill: var(--ink); }
+  .room { fill: #ece9df; stroke: #b8b8af; stroke-width: 12; }
+  .room.alt { fill: #e2ebe6; }
+  .wall { stroke: var(--ink); stroke-linecap: square; }
+  .opening-cut { stroke: var(--sheet); stroke-linecap: butt; }
+  .opening { stroke: var(--accent); fill: none; }
+  .dimension { stroke: var(--line-strong); fill: none; stroke-width: 14; }
+  .system-route { fill: none; stroke-width: 44; stroke-linejoin: round; stroke-linecap: round; }
+  .system-node { stroke: var(--sheet); stroke-width: 24; }
+  .selected { filter: drop-shadow(0 0 75px rgba(182,75,52,.75)); }
+  @media (max-width: 900px) {
+    .app { grid-template-rows: auto 1fr; }
+    header { flex-wrap: wrap; }
+    .brand { width: auto; flex: 1 1 230px; }
+    nav { order: 3; width: 100%; height: 48px; border-top: 1px solid var(--line); }
+    .status { padding: 0 12px; }
+    .status span { display: none; }
+    .workspace { grid-template-columns: 1fr; grid-template-rows: minmax(55vh, 1fr) minmax(240px, auto); overflow-y: auto; }
+    aside { border-left: 0; border-top: 1px solid var(--line); max-height: none; }
+    .route-legend { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><strong id="project-name">Concept Architecture Studio</strong><span id="project-meta">Loading model...</span></div>
+    <nav aria-label="Studio views">
+      <button class="tab" data-view="plan" aria-selected="true">Plan</button>
+      <button class="tab" data-view="elevation" aria-selected="false">Elevations</button>
+      <button class="tab" data-view="model" aria-selected="false">3D Model</button>
+      <button class="tab" data-view="systems" aria-selected="false">Systems</button>
+      <button class="tab" data-view="code" aria-selected="false">Code</button>
+      <button class="tab" data-view="assumptions" aria-selected="false">Assumptions</button>
+    </nav>
+    <div class="status"><i></i><span>Concept only<br>professional review required</span></div>
+  </header>
+  <div class="workspace">
+    <section class="stage">
+      <div class="toolbar">
+        <label id="level-control">Level <select id="level"></select></label>
+        <label id="elevation-control" class="hidden-view">View <select id="elevation"><option value="north">North</option><option value="east">East</option><option value="south">South</option><option value="west">West</option></select></label>
+        <button class="tool" id="mode-orbit" aria-pressed="true">Orbit</button>
+        <button class="tool" id="mode-walk" aria-pressed="false">Walk</button>
+        <button class="tool system-toggle" data-system="plumbing" aria-pressed="true">Plumbing</button>
+        <button class="tool system-toggle" data-system="electrical" aria-pressed="true">Electrical</button>
+        <button class="tool system-toggle" data-system="mechanical" aria-pressed="true">Mechanical</button>
+        <div class="route-legend"><span><i class="plumbing"></i>Plumbing</span><span><i class="electrical"></i>Electrical</span><span><i class="mechanical"></i>Mechanical</span></div>
+      </div>
+      <div class="canvas-wrap">
+        <svg id="drawing" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Derived architectural drawing"></svg>
+        <canvas id="model3d" class="hidden-view" aria-label="Interactive three-dimensional concept model"></canvas>
+        <article id="content" class="hidden-view"></article>
+        <div class="view-title"><strong id="view-name">Plan</strong><span id="view-detail">Derived from models/building.json</span></div>
+        <div id="model-help" class="model-help hidden-view">Drag to look · wheel to zoom<br>Walk: W A S D · Q E</div>
+      </div>
+    </section>
+    <aside><div class="inspector" id="inspector"><span class="kicker">Model status</span><h2>Loading</h2><p class="lede">Reading the canonical building model.</p></div></aside>
+  </div>
+</div>
+<script>
+(() => {
+  'use strict';
+
+  const COLORS = { plumbing: '#315fa3', electrical: '#b64b34', mechanical: '#187773' };
+  const state = {
+    model: null,
+    view: 'plan',
+    levelId: null,
+    elevation: 'north',
+    systems: new Set(['plumbing', 'electrical', 'mechanical']),
+    findings: [],
+    selected: null,
+    cameraMode: 'orbit'
+  };
+  const drawing = document.querySelector('#drawing');
+  const canvas = document.querySelector('#model3d');
+  const content = document.querySelector('#content');
+  const inspector = document.querySelector('#inspector');
+  const viewName = document.querySelector('#view-name');
+  const viewDetail = document.querySelector('#view-detail');
+  const levelSelect = document.querySelector('#level');
+  const elevationSelect = document.querySelector('#elevation');
+  const levelControl = document.querySelector('#level-control');
+  const elevationControl = document.querySelector('#elevation-control');
+  const modelHelp = document.querySelector('#model-help');
+  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const evidence = (note = 'Generated concept value.') => ({ source: 'generated', confidence: 0.5, status: 'needs-review', note });
+
+  function formatLength(mm) {
+    if (state.model?.project.coordinates.displayUnits === 'metric') {
+      return Math.abs(mm) >= 10000 ? `${(mm / 1000).toFixed(2)} m` : `${Math.round(mm)} mm`;
+    }
+    let eighths = Math.round(mm / 25.4 * 8);
+    const feet = Math.floor(eighths / 96);
+    eighths -= feet * 96;
+    let inches = Math.floor(eighths / 8);
+    const fraction = eighths % 8;
+    if (inches === 12) { inches = 0; eighths = 0; }
+    const fractions = ['', '1/8', '1/4', '3/8', '1/2', '5/8', '3/4', '7/8'];
+    return `${feet}'-${String(inches).padStart(2, '0')}"${fraction ? ` ${fractions[fraction]}` : ''}`;
+  }
+
+  function allEntityIds(model) {
+    const groups = ['levels', 'spaces', 'walls', 'openings', 'slabs', 'roofs', 'stairs', 'fixtures', 'equipment', 'systems', 'dimensions', 'sections', 'viewpoints', 'assumptions'];
+    const entities = [model.project];
+    for (const group of groups) entities.push(...(model[group] ?? []));
+    for (const system of model.systems ?? []) entities.push(...system.nodes, ...system.edges);
+    return entities;
+  }
+
+  function validateModel(model) {
+    const findings = [];
+    const add = (severity, code, message, entityId) => findings.push({ severity, code, message, entityId });
+    if (model?.schemaVersion !== '1.0.0') add('error', 'schema.version', 'Expected schemaVersion 1.0.0.');
+    const ids = new Set(); let reviewEvidenceCount = 0;
+    for (const entity of allEntityIds(model)) {
+      if (!entity?.id) { add('error', 'entity.id', 'An entity is missing its stable ID.'); continue; }
+      if (ids.has(entity.id)) add('error', 'entity.duplicate', `Duplicate entity ID: ${entity.id}`, entity.id);
+      ids.add(entity.id);
+      if (entity.evidence?.confidence < 0.75 || entity.evidence?.status === 'needs-review') reviewEvidenceCount += 1;
+    }
+    if (reviewEvidenceCount > 0) add('advisory', 'evidence.review', `${reviewEvidenceCount} entities carry low-confidence or needs-review evidence.`, model.project?.id);
+    const levels = new Map((model.levels ?? []).map(level => [level.id, level]));
+    const walls = new Map((model.walls ?? []).map(wall => [wall.id, wall]));
+    for (const entity of [...(model.spaces ?? []), ...(model.walls ?? []), ...(model.slabs ?? []), ...(model.fixtures ?? []), ...(model.equipment ?? [])]) {
+      if (!levels.has(entity.levelId)) add('error', 'reference.level', `Unknown level ${entity.levelId}.`, entity.id);
+    }
+    for (const wall of model.walls ?? []) {
+      const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+      if (length < 1 || wall.thicknessMm < 1 || wall.heightMm < 1) add('error', 'wall.geometry', 'Wall has invalid length, thickness, or height.', wall.id);
+    }
+    for (const opening of model.openings ?? []) {
+      const wall = walls.get(opening.wallId);
+      if (!wall) { add('error', 'reference.wall', `Unknown wall ${opening.wallId}.`, opening.id); continue; }
+      const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+      if (opening.offsetMm + opening.widthMm > length + 3 || opening.sillMm + opening.heightMm > wall.heightMm + 3) add('error', 'opening.fit', 'Opening falls outside its host wall.', opening.id);
+    }
+    for (const stair of model.stairs ?? []) {
+      const from = levels.get(stair.fromLevelId); const to = levels.get(stair.toLevelId);
+      if (!from || !to) add('error', 'stair.level', 'Stair references an unknown level.', stair.id);
+      else if (stair.riserCount < 1 || to.elevationMm <= from.elevationMm) add('error', 'stair.rise', 'Stair has an invalid rise or riser count.', stair.id);
+      else add('warning', 'stair.code', `Concept riser is ${formatLength((to.elevationMm - from.elevationMm) / stair.riserCount)}; code verification remains open.`, stair.id);
+    }
+    const nodes = new Set((model.systems ?? []).flatMap(system => system.nodes.map(node => node.id)));
+    for (const system of model.systems ?? []) {
+      const local = new Set(system.nodes.map(node => node.id));
+      for (const edge of system.edges) if (!local.has(edge.from) || !local.has(edge.to)) add('error', 'system.edge', 'System edge references a node outside its system.', edge.id);
+      if (system.status !== 'concept') add('advisory', 'system.review', `${system.name} remains conceptual.`, system.id);
+    }
+    for (const object of [...(model.fixtures ?? []), ...(model.equipment ?? [])]) {
+      for (const connection of object.connections ?? []) if (!nodes.has(connection)) add('error', 'system.connection', `Unknown system connection ${connection}.`, object.id);
+    }
+    if (model.project?.jurisdiction?.codeReviewStatus !== 'researched') add('warning', 'code.status', 'Jurisdiction code review is incomplete or unavailable.', model.project?.id);
+    return findings;
+  }
+
+  function modelBounds(model) {
+    const points = [
+      ...(model.spaces ?? []).flatMap(space => space.boundary),
+      ...(model.walls ?? []).flatMap(wall => [wall.start, wall.end]),
+      ...(model.roofs ?? []).flatMap(roof => roof.footprint)
+    ];
+    return {
+      minX: Math.min(...points.map(point => point.x)), maxX: Math.max(...points.map(point => point.x)),
+      minY: Math.min(...points.map(point => point.y)), maxY: Math.max(...points.map(point => point.y))
+    };
+  }
+
+  function centroid(points) {
+    return { x: points.reduce((sum, p) => sum + p.x, 0) / points.length, y: points.reduce((sum, p) => sum + p.y, 0) / points.length };
+  }
+
+  function pointAlongWall(wall, offset) {
+    const dx = wall.end.x - wall.start.x; const dy = wall.end.y - wall.start.y;
+    const length = Math.hypot(dx, dy) || 1;
+    return { x: wall.start.x + dx / length * offset, y: wall.start.y + dy / length * offset };
+  }
+
+  function planSvg(includeSystems) {
+    const model = state.model; const bounds = modelBounds(model); const pad = 1500;
+    const width = bounds.maxX - bounds.minX; const height = bounds.maxY - bounds.minY;
+    const level = model.levels.find(item => item.id === state.levelId);
+    const polygon = points => points.map(point => `${point.x},${-point.y}`).join(' ');
+    const chunks = [`<g data-layer="spaces">`];
+    model.spaces.filter(space => space.levelId === state.levelId).forEach((space, index) => {
+      const center = centroid(space.boundary); const xs = space.boundary.map(point => point.x); const roomWidth = Math.max(...xs) - Math.min(...xs); const subtitle = roomWidth >= 5200 ? `<text x="${center.x}" y="${-center.y + 250}" text-anchor="middle" font-size="190" fill="#69706a">${escapeHtml(space.use)}</text>` : '';
+      chunks.push(`<g data-entity="${space.id}"><polygon class="room ${index % 2 ? 'alt' : ''}" points="${polygon(space.boundary)}"/><text x="${center.x}" y="${-center.y - 90}" text-anchor="middle" font-size="270" font-weight="700">${escapeHtml(space.name)}</text>${subtitle}</g>`);
+    });
+    chunks.push('</g><g data-layer="walls">');
+    model.walls.filter(wall => wall.levelId === state.levelId).forEach(wall => chunks.push(`<line class="wall" data-entity="${wall.id}" x1="${wall.start.x}" y1="${-wall.start.y}" x2="${wall.end.x}" y2="${-wall.end.y}" stroke-width="${wall.thicknessMm}"/>`));
+    chunks.push('</g><g data-layer="openings">');
+    model.openings.forEach(opening => {
+      const wall = model.walls.find(item => item.id === opening.wallId);
+      if (!wall || wall.levelId !== state.levelId) return;
+      const start = pointAlongWall(wall, opening.offsetMm); const end = pointAlongWall(wall, opening.offsetMm + opening.widthMm);
+      chunks.push(`<g data-entity="${opening.id}"><line class="opening-cut" x1="${start.x}" y1="${-start.y}" x2="${end.x}" y2="${-end.y}" stroke-width="${wall.thicknessMm * 1.45}"/><line class="opening" x1="${start.x}" y1="${-start.y}" x2="${end.x}" y2="${-end.y}" stroke-width="38"/></g>`);
+    });
+    chunks.push('</g>');
+    if (includeSystems) chunks.push(systemSvg(null));
+    const overallY = -bounds.minY + 820;
+    const overallX = bounds.maxX + 820;
+    chunks.push(`<g data-layer="dimensions"><path class="dimension" d="M${bounds.minX},${overallY}V${overallY + 150}M${bounds.minX},${overallY + 75}H${bounds.maxX}M${bounds.maxX},${overallY}V${overallY + 150}"/><text x="${(bounds.minX + bounds.maxX) / 2}" y="${overallY - 100}" text-anchor="middle" font-size="200">${escapeHtml(formatLength(width))}</text><path class="dimension" d="M${overallX},${-bounds.minY}H${overallX + 150}M${overallX + 75},${-bounds.minY}V${-bounds.maxY}M${overallX},${-bounds.maxY}H${overallX + 150}"/><text x="${overallX + 330}" y="${-(bounds.minY + bounds.maxY) / 2}" transform="rotate(-90 ${overallX + 330} ${-(bounds.minY + bounds.maxY) / 2})" text-anchor="middle" font-size="200">${escapeHtml(formatLength(height))}</text></g>`);
+    chunks.push(`<text x="${bounds.minX}" y="${-bounds.maxY - 700}" font-size="250" font-weight="700">${escapeHtml(level?.name ?? '')}</text>`);
+    drawing.setAttribute('viewBox', `${bounds.minX - pad} ${-bounds.maxY - pad} ${width + pad * 2} ${height + pad * 2}`);
+    return chunks.join('');
+  }
+
+  function systemSvg(levelId) {
+    const chunks = ['<g data-layer="systems">'];
+    for (const system of state.model.systems) {
+      if (!state.systems.has(system.discipline)) continue;
+      const color = COLORS[system.discipline];
+      for (const edge of system.edges) {
+        const points = edge.path.filter(point => !levelId || Math.abs(point.z - (state.model.levels.find(level => level.id === levelId)?.elevationMm ?? 0)) < 3400);
+        if (points.length < 2) continue;
+        chunks.push(`<polyline class="system-route" data-entity="${edge.id}" points="${points.map(point => `${point.x},${-point.y}`).join(' ')}" stroke="${color}" opacity=".88"/>`);
+      }
+      for (const node of system.nodes) {
+        if (levelId && node.levelId && node.levelId !== levelId) continue;
+        chunks.push(`<circle class="system-node" data-entity="${node.id}" cx="${node.position.x}" cy="${-node.position.y}" r="115" fill="${color}"/>`);
+      }
+    }
+    chunks.push('</g>');
+    return chunks.join('');
+  }
+
+  function elevationSvg() {
+    const model = state.model; const bounds = modelBounds(model); const roof = model.roofs[0];
+    const side = state.elevation; const horizontal = side === 'north' || side === 'south' ? 'x' : 'y';
+    const minH = horizontal === 'x' ? bounds.minX : bounds.minY; const maxH = horizontal === 'x' ? bounds.maxX : bounds.maxY;
+    const gable = (side === 'north' || side === 'south') ? roof?.ridgeAxis === 'y' : roof?.ridgeAxis === 'x';
+    const maxZ = roof?.ridgeElevationMm ?? Math.max(...model.levels.map(level => level.elevationMm + (level.floorToFloorMm ?? 3000)));
+    const eave = roof?.eaveElevationMm ?? maxZ;
+    const silhouette = gable
+      ? `${minH},0 ${maxH},0 ${maxH},${-eave} ${(minH + maxH) / 2},${-maxZ} ${minH},${-eave}`
+      : `${minH},0 ${maxH},0 ${maxH},${-eave} ${minH},${-eave}`;
+    const chunks = [`<polygon points="${silhouette}" fill="#e7e5dc" stroke="#202622" stroke-width="40"/>`];
+    const isVisibleWall = wall => {
+      const epsilon = 3;
+      if (side === 'north') return Math.abs(wall.start.y - bounds.minY) < epsilon && Math.abs(wall.end.y - bounds.minY) < epsilon;
+      if (side === 'south') return Math.abs(wall.start.y - bounds.maxY) < epsilon && Math.abs(wall.end.y - bounds.maxY) < epsilon;
+      if (side === 'east') return Math.abs(wall.start.x - bounds.maxX) < epsilon && Math.abs(wall.end.x - bounds.maxX) < epsilon;
+      return Math.abs(wall.start.x - bounds.minX) < epsilon && Math.abs(wall.end.x - bounds.minX) < epsilon;
+    };
+    for (const opening of model.openings) {
+      const wall = model.walls.find(item => item.id === opening.wallId); if (!wall || !isVisibleWall(wall)) continue;
+      const level = model.levels.find(item => item.id === wall.levelId); const p0 = pointAlongWall(wall, opening.offsetMm); const p1 = pointAlongWall(wall, opening.offsetMm + opening.widthMm);
+      const h0 = horizontal === 'x' ? p0.x : p0.y; const h1 = horizontal === 'x' ? p1.x : p1.y;
+      const left = Math.min(h0, h1); const width = Math.abs(h1 - h0); const bottom = (level?.elevationMm ?? 0) + opening.sillMm;
+      chunks.push(`<g data-entity="${opening.id}"><rect x="${left}" y="${-(bottom + opening.heightMm)}" width="${width}" height="${opening.heightMm}" fill="${opening.kind === 'window' ? '#b9d4dd' : '#f6f1e6'}" stroke="#202622" stroke-width="28"/><text x="${left + width / 2}" y="${-(bottom + opening.heightMm / 2)}" text-anchor="middle" font-size="160">${escapeHtml(opening.kind)}</text></g>`);
+    }
+    for (const level of model.levels) chunks.push(`<path d="M${minH - 700},${-level.elevationMm}H${maxH + 700}" stroke="#8c918b" stroke-width="15" stroke-dasharray="110 75"/><text x="${minH - 760}" y="${-level.elevationMm - 70}" text-anchor="end" font-size="150">${escapeHtml(level.name)} · ${escapeHtml(formatLength(level.elevationMm))}</text>`);
+    drawing.setAttribute('viewBox', `${minH - 3400} ${-maxZ - 900} ${maxH - minH + 4600} ${maxZ + 1800}`);
+    return chunks.join('');
+  }
+
+  function renderDocument(kind) {
+    if (kind === 'assumptions') {
+      content.innerHTML = `<div class="page"><span class="kicker">Professional handoff boundary</span><h1>Assumptions remain part of the design.</h1><p>Every unresolved fact stays attached to the model instead of disappearing behind polished drawings.</p><table><thead><tr><th>Topic</th><th>Statement</th><th>Impact</th></tr></thead><tbody>${state.model.assumptions.map(item => `<tr data-entity="${item.id}"><td>${escapeHtml(item.topic)}</td><td>${escapeHtml(item.statement)}</td><td>${escapeHtml(item.impact)}</td></tr>`).join('')}</tbody></table><div class="disclaimer">Concept only. A licensed architect and the relevant engineering disciplines must verify these assumptions before they inform construction.</div></div>`;
+      return;
+    }
+    const jurisdiction = state.model.project.jurisdiction;
+    content.innerHTML = `<div class="page"><span class="kicker">Advisory code review</span><h1>No compliance claim without evidence.</h1><p>This model targets ${escapeHtml([jurisdiction.locality, jurisdiction.county, jurisdiction.stateOrRegion, jurisdiction.country].filter(Boolean).join(', '))}. Its code review status is <strong>${escapeHtml(jurisdiction.codeReviewStatus)}</strong>.</p><h2>Coverage</h2><div class="empty">No cited code findings were staged with this model. Research adopted codes and local amendments from official sources, or attach source documents. Until then, stairs, egress, accessibility, setbacks, equipment clearances, fire separation, and occupancy assumptions remain unresolved.</div><h2>Required output</h2><p>Code findings must record issuing authority, title, edition or adoption date, source URL or document, accessed date, applicability, affected model entities, confidence, and review status. Never report this concept as “code compliant.”</p><div class="disclaimer">Advisory only. Confirm interpretations with the authority having jurisdiction and licensed professionals.</div></div>`;
+  }
+
+  function selectedEntity() {
+    return allEntityIds(state.model).find(entity => entity.id === state.selected) ?? null;
+  }
+
+  function renderInspector() {
+    const entity = selectedEntity(); const errors = state.findings.filter(item => item.severity === 'error');
+    if (entity) {
+      const ev = entity.evidence ?? evidence('Derived output without authored evidence.');
+      inspector.innerHTML = `<span class="kicker">Selected entity</span><h2>${escapeHtml(entity.name ?? entity.id)}</h2><p class="lede">${escapeHtml(entity.use ?? entity.kind ?? entity.discipline ?? entity.statement ?? 'Model entity')}</p><dl class="metric"><dt>ID</dt><dd>${escapeHtml(entity.id)}</dd><dt>Source</dt><dd>${escapeHtml(ev.source)}</dd><dt>Confidence</dt><dd>${Math.round((ev.confidence ?? 0) * 100)}%</dd><dt>Status</dt><dd>${escapeHtml(ev.status)}</dd></dl><div class="rule"></div><p>${escapeHtml(ev.note)}</p><button class="tool" id="clear-selection">Clear selection</button><div class="disclaimer">Concept only. Selected geometry and systems require professional verification.</div>`;
+      document.querySelector('#clear-selection')?.addEventListener('click', () => { state.selected = null; render(); });
+      return;
+    }
+    const counts = state.findings.reduce((out, finding) => { out[finding.severity] = (out[finding.severity] ?? 0) + 1; return out; }, {});
+    inspector.innerHTML = `<span class="kicker">Model diagnostics</span><h2>${errors.length ? 'Resolve model errors' : 'Internally consistent concept'}</h2><p class="lede">${escapeHtml(state.model.project.description ?? '')}</p><dl class="metric"><dt>Levels</dt><dd>${state.model.levels.length}</dd><dt>Spaces</dt><dd>${state.model.spaces.length}</dd><dt>Openings</dt><dd>${state.model.openings.length}</dd><dt>System networks</dt><dd>${state.model.systems.length}</dd><dt>Errors</dt><dd>${counts.error ?? 0}</dd><dt>Warnings</dt><dd>${counts.warning ?? 0}</dd><dt>Advisories</dt><dd>${counts.advisory ?? 0}</dd></dl><div class="rule"></div><span class="kicker">Priority findings</span><div class="diagnostics">${state.findings.slice(0, 8).map(item => `<button class="finding ${item.severity}" data-select="${escapeHtml(item.entityId ?? '')}"><b>${escapeHtml(item.severity)} · ${escapeHtml(item.code)}</b><span>${escapeHtml(item.message)}</span></button>`).join('') || '<p>No findings.</p>'}</div><div class="disclaimer">Concept only. This is not a permit set, engineering design, survey, or construction document.</div>`;
+    inspector.querySelectorAll('[data-select]').forEach(button => button.addEventListener('click', () => { state.selected = button.dataset.select || null; render(); }));
+  }
+
+  let glState = null;
+  function initWebGL() {
+    const gl = canvas.getContext('webgl2', { antialias: true, alpha: false });
+    if (!gl) { state.findings.unshift({ severity: 'error', code: 'webgl.unavailable', message: 'WebGL2 is unavailable; the 3D view cannot render.' }); renderInspector(); return null; }
+    const vertexSource = `#version 300 es\nin vec3 aPosition;in vec3 aColor;uniform mat4 uMvp;out vec3 vColor;void main(){vColor=aColor;gl_Position=uMvp*vec4(aPosition,1.0);}`;
+    const fragmentSource = `#version 300 es\nprecision highp float;in vec3 vColor;out vec4 outColor;void main(){outColor=vec4(vColor,1.0);}`;
+    const compile = (type, source) => { const shader = gl.createShader(type); gl.shaderSource(shader, source); gl.compileShader(shader); if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader)); return shader; };
+    const program = gl.createProgram(); gl.attachShader(program, compile(gl.VERTEX_SHADER, vertexSource)); gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragmentSource)); gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+    const gls = { gl, program, position: gl.getAttribLocation(program, 'aPosition'), color: gl.getAttribLocation(program, 'aColor'), mvp: gl.getUniformLocation(program, 'uMvp'), triangles: [], lines: [], yaw: .72, pitch: .47, radius: 24, dragging: false, lastX: 0, lastY: 0, walkPosition: [4.8, 1.7, -9.2] };
+    buildScene(gls); bind3DControls(gls); return gls;
+  }
+
+  const rgb = hex => [parseInt(hex.slice(1, 3), 16) / 255, parseInt(hex.slice(3, 5), 16) / 255, parseInt(hex.slice(5, 7), 16) / 255];
+  function pushPrism(target, cx, cy, cz, length, height, depth, angle, color) {
+    const c = Math.cos(angle), s = Math.sin(angle), hx = length / 2, hy = height / 2, hz = depth / 2;
+    const local = [[-hx,-hy,-hz],[hx,-hy,-hz],[hx,hy,-hz],[-hx,hy,-hz],[-hx,-hy,hz],[hx,-hy,hz],[hx,hy,hz],[-hx,hy,hz]];
+    const points = local.map(([x,y,z]) => [cx + x*c - z*s, cy + y, cz + x*s + z*c]);
+    const faces = [[0,1,2,0,2,3],[5,4,7,5,7,6],[4,0,3,4,3,7],[1,5,6,1,6,2],[3,2,6,3,6,7],[4,5,1,4,1,0]];
+    faces.flat().forEach(index => target.push(...points[index], ...color));
+  }
+
+  function pushLine(target, a, b, color) { target.push(a[0],a[1],a[2],...color,b[0],b[1],b[2],...color); }
+  const worldPoint = point => [point.x / 1000, point.z / 1000, -point.y / 1000];
+
+  function buildScene(gls) {
+    gls.triangles.length = 0; gls.lines.length = 0; const model = state.model;
+    const levelMap = new Map(model.levels.map(level => [level.id, level]));
+    for (const slab of model.slabs) {
+      const level = levelMap.get(slab.levelId); const xs = slab.boundary.map(p => p.x); const ys = slab.boundary.map(p => p.y);
+      pushPrism(gls.triangles, (Math.min(...xs)+Math.max(...xs))/2000, ((level?.elevationMm ?? 0)-slab.thicknessMm/2)/1000, -(Math.min(...ys)+Math.max(...ys))/2000, (Math.max(...xs)-Math.min(...xs))/1000, slab.thicknessMm/1000, (Math.max(...ys)-Math.min(...ys))/1000, 0, rgb('#b9b8b0'));
+    }
+    for (const wall of model.walls) {
+      const level = levelMap.get(wall.levelId); const length = Math.hypot(wall.end.x-wall.start.x,wall.end.y-wall.start.y); const openings = model.openings.filter(item => item.wallId === wall.id).sort((a,b)=>a.offsetMm-b.offsetMm);
+      const angle = Math.atan2(-(wall.end.y-wall.start.y), wall.end.x-wall.start.x); const unit = { x:(wall.end.x-wall.start.x)/length, y:(wall.end.y-wall.start.y)/length };
+      const addChunk = (from,to,z0,z1) => { if (to-from < 1 || z1-z0 < 1) return; const offset=(from+to)/2; const x=wall.start.x+unit.x*offset; const y=wall.start.y+unit.y*offset; pushPrism(gls.triangles,x/1000,((level?.elevationMm??0)+(wall.baseOffsetMm??0)+z0+(z1-z0)/2)/1000,-y/1000,(to-from)/1000,(z1-z0)/1000,wall.thicknessMm/1000,angle,rgb(wall.kind==='exterior'?'#d6d0c3':'#b8c7bd')); };
+      let cursor=0; for(const opening of openings){addChunk(cursor,opening.offsetMm,0,wall.heightMm);addChunk(opening.offsetMm,opening.offsetMm+opening.widthMm,0,opening.sillMm);addChunk(opening.offsetMm,opening.offsetMm+opening.widthMm,opening.sillMm+opening.heightMm,wall.heightMm);cursor=opening.offsetMm+opening.widthMm;} addChunk(cursor,length,0,wall.heightMm);
+    }
+    for (const object of [...model.fixtures, ...model.equipment]) {
+      const color = object.kind.includes('panel') ? '#b64b34' : object.kind.includes('heat') ? '#187773' : '#d69d43';
+      pushPrism(gls.triangles, object.position.x/1000, (object.position.z+object.size.z/2)/1000, -object.position.y/1000, object.size.x/1000, object.size.z/1000, object.size.y/1000, -object.rotationDeg*Math.PI/180, rgb(color));
+    }
+    for (const roof of model.roofs) {
+      const xs=roof.footprint.map(p=>p.x), ys=roof.footprint.map(p=>p.y), minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+      const lineColor=rgb('#7a6650'); [[minX,minY],[maxX,minY],[maxX,maxY],[minX,maxY],[minX,minY]].slice(0,-1).forEach((p,i)=>pushLine(gls.lines,worldPoint({x:p[0],y:p[1],z:roof.eaveElevationMm}),worldPoint({x:[[minX,minY],[maxX,minY],[maxX,maxY],[minX,maxY],[minX,minY]][i+1][0],y:[[minX,minY],[maxX,minY],[maxX,maxY],[minX,maxY],[minX,minY]][i+1][1],z:roof.eaveElevationMm}),lineColor));
+      const mid=roof.ridgeAxis==='y'?(minX+maxX)/2:(minY+maxY)/2; const a=roof.ridgeAxis==='y'?{x:mid,y:minY,z:roof.ridgeElevationMm}:{x:minX,y:mid,z:roof.ridgeElevationMm}; const b=roof.ridgeAxis==='y'?{x:mid,y:maxY,z:roof.ridgeElevationMm}:{x:maxX,y:mid,z:roof.ridgeElevationMm}; pushLine(gls.lines,worldPoint(a),worldPoint(b),lineColor);
+    }
+    for (const system of model.systems) if (state.systems.has(system.discipline)) for (const edge of system.edges) for (let i=1;i<edge.path.length;i++) pushLine(gls.lines,worldPoint(edge.path[i-1]),worldPoint(edge.path[i]),rgb(COLORS[system.discipline]));
+  }
+
+  function mat4Perspective(fov, aspect, near, far) { const f=1/Math.tan(fov/2),nf=1/(near-far); return new Float32Array([f/aspect,0,0,0,0,f,0,0,0,0,(far+near)*nf,-1,0,0,2*far*near*nf,0]); }
+  function normalize(v){const l=Math.hypot(...v)||1;return v.map(n=>n/l);} function cross(a,b){return[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];} function dot(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}
+  function mat4LookAt(eye, center) { const z=normalize([eye[0]-center[0],eye[1]-center[1],eye[2]-center[2]]),x=normalize(cross([0,1,0],z)),y=cross(z,x); return new Float32Array([x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-dot(x,eye),-dot(y,eye),-dot(z,eye),1]); }
+  function mat4Multiply(a,b){const out=new Float32Array(16);for(let col=0;col<4;col++)for(let row=0;row<4;row++){let sum=0;for(let k=0;k<4;k++)sum+=a[row+k*4]*b[k+col*4];out[row+col*4]=sum;}return out;}
+
+  function drawBuffer(gls, data, mode) {
+    if (!data.length) return; const {gl}=gls, buffer=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buffer); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW); gl.enableVertexAttribArray(gls.position); gl.vertexAttribPointer(gls.position,3,gl.FLOAT,false,24,0); gl.enableVertexAttribArray(gls.color); gl.vertexAttribPointer(gls.color,3,gl.FLOAT,false,24,12); gl.drawArrays(mode,0,data.length/6); gl.deleteBuffer(buffer);
+  }
+
+  function renderWebGL() {
+    if (!glState) glState=initWebGL(); if (!glState) return; const {gl}=glState; const rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2),w=Math.max(1,Math.floor(rect.width*dpr)),h=Math.max(1,Math.floor(rect.height*dpr)); if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;} gl.viewport(0,0,w,h); gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE); gl.clearColor(.875,.902,.886,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    const bounds=modelBounds(state.model),center=[(bounds.minX+bounds.maxX)/2000,3.7,-(bounds.minY+bounds.maxY)/2000]; let eye,target;
+    if(state.cameraMode==='orbit'){const cp=Math.cos(glState.pitch);eye=[center[0]+Math.sin(glState.yaw)*cp*glState.radius,center[1]+Math.sin(glState.pitch)*glState.radius,center[2]+Math.cos(glState.yaw)*cp*glState.radius];target=center;}else{eye=glState.walkPosition;target=[eye[0]+Math.sin(glState.yaw),eye[1]+Math.tan(glState.pitch),eye[2]-Math.cos(glState.yaw)];}
+    const mvp=mat4Multiply(mat4Perspective(Math.PI/3,w/h,.05,200),mat4LookAt(eye,target)); gl.useProgram(glState.program); gl.uniformMatrix4fv(glState.mvp,false,mvp); drawBuffer(glState,glState.triangles,gl.TRIANGLES); gl.lineWidth(3); drawBuffer(glState,glState.lines,gl.LINES);
+  }
+
+  function bind3DControls(gls) {
+    canvas.addEventListener('pointerdown',event=>{gls.dragging=true;gls.lastX=event.clientX;gls.lastY=event.clientY;canvas.setPointerCapture(event.pointerId);});
+    canvas.addEventListener('pointerup',()=>gls.dragging=false);
+    canvas.addEventListener('pointermove',event=>{if(!gls.dragging)return;gls.yaw+=(event.clientX-gls.lastX)*.006;gls.pitch=Math.max(-1.2,Math.min(1.2,gls.pitch-(event.clientY-gls.lastY)*.006));gls.lastX=event.clientX;gls.lastY=event.clientY;renderWebGL();});
+    canvas.addEventListener('wheel',event=>{event.preventDefault();gls.radius=Math.max(7,Math.min(60,gls.radius+event.deltaY*.02));renderWebGL();},{passive:false});
+    window.addEventListener('keydown',event=>{if(state.view!=='model'||state.cameraMode!=='walk')return;const speed=event.shiftKey?1:.45,forward=[Math.sin(gls.yaw),0,-Math.cos(gls.yaw)],right=[Math.cos(gls.yaw),0,Math.sin(gls.yaw)];if(event.key.toLowerCase()==='w')gls.walkPosition=gls.walkPosition.map((n,i)=>n+forward[i]*speed);if(event.key.toLowerCase()==='s')gls.walkPosition=gls.walkPosition.map((n,i)=>n-forward[i]*speed);if(event.key.toLowerCase()==='a')gls.walkPosition=gls.walkPosition.map((n,i)=>n-right[i]*speed);if(event.key.toLowerCase()==='d')gls.walkPosition=gls.walkPosition.map((n,i)=>n+right[i]*speed);if(event.key.toLowerCase()==='q')gls.walkPosition[1]=Math.max(.8,gls.walkPosition[1]-.2);if(event.key.toLowerCase()==='e')gls.walkPosition[1]=Math.min(8,gls.walkPosition[1]+.2);renderWebGL();});
+  }
+
+  function render() {
+    if (!state.model) return; const isDocument=state.view==='code'||state.view==='assumptions';
+    drawing.classList.toggle('hidden-view',state.view==='model'||isDocument); canvas.classList.toggle('hidden-view',state.view!=='model'); content.classList.toggle('hidden-view',!isDocument); modelHelp.classList.toggle('hidden-view',state.view!=='model');
+    levelControl.classList.toggle('hidden-view',!['plan','systems'].includes(state.view)); elevationControl.classList.toggle('hidden-view',state.view!=='elevation'); document.querySelectorAll('#mode-orbit,#mode-walk').forEach(el=>el.classList.toggle('hidden',state.view!=='model')); document.querySelectorAll('.system-toggle').forEach(el=>el.classList.toggle('hidden',!['systems','model'].includes(state.view)));
+    if(state.view==='plan'){drawing.innerHTML=planSvg(false);viewName.textContent='Plan';viewDetail.textContent='Dimensions and openings derived from the active model';}
+    if(state.view==='systems'){drawing.innerHTML=planSvg(true);viewName.textContent='Systems coordination';viewDetail.textContent='Concept routes · sizing and loads unresolved';}
+    if(state.view==='elevation'){drawing.innerHTML=elevationSvg();viewName.textContent=`${state.elevation[0].toUpperCase()+state.elevation.slice(1)} Elevation`;viewDetail.textContent='Orthographic projection from wall, opening, level, and roof entities';}
+    if(state.view==='model'){viewName.textContent='Interactive model';viewDetail.textContent=state.cameraMode==='walk'?'Walk mode · no construction tolerances implied':'Orbit mode · shared model coordinates';if(glState)buildScene(glState);requestAnimationFrame(renderWebGL);}
+    if(isDocument){renderDocument(state.view);viewName.textContent=state.view==='code'?'Code review':'Assumptions';viewDetail.textContent='Professional handoff evidence';}
+    drawing.querySelectorAll('[data-entity]').forEach(el=>{if(el.dataset.entity===state.selected)el.classList.add('selected');el.addEventListener('click',()=>{state.selected=el.dataset.entity;render();});});
+    content.querySelectorAll('[data-entity]').forEach(el=>el.addEventListener('click',()=>{state.selected=el.dataset.entity;renderInspector();})); renderInspector();
+  }
+
+  function wireControls() {
+    document.querySelectorAll('.tab').forEach(tab=>tab.addEventListener('click',()=>{state.view=tab.dataset.view;document.querySelectorAll('.tab').forEach(item=>item.setAttribute('aria-selected',String(item===tab)));render();}));
+    levelSelect.addEventListener('change',()=>{state.levelId=levelSelect.value;render();}); elevationSelect.addEventListener('change',()=>{state.elevation=elevationSelect.value;render();});
+    document.querySelectorAll('.system-toggle').forEach(button=>button.addEventListener('click',()=>{const key=button.dataset.system;if(state.systems.has(key))state.systems.delete(key);else state.systems.add(key);button.setAttribute('aria-pressed',String(state.systems.has(key)));if(glState)buildScene(glState);render();}));
+    document.querySelector('#mode-orbit').addEventListener('click',()=>{state.cameraMode='orbit';document.querySelector('#mode-orbit').setAttribute('aria-pressed','true');document.querySelector('#mode-walk').setAttribute('aria-pressed','false');render();});
+    document.querySelector('#mode-walk').addEventListener('click',()=>{state.cameraMode='walk';document.querySelector('#mode-orbit').setAttribute('aria-pressed','false');document.querySelector('#mode-walk').setAttribute('aria-pressed','true');render();});
+    window.addEventListener('resize',()=>{if(state.view==='model')renderWebGL();});
+  }
+
+  async function start() {
+    try {
+      const params=new URLSearchParams(location.search); const modelPath=params.get('model')||'./models/building.json'; const response=await fetch(modelPath,{cache:'no-store'}); if(!response.ok)throw new Error(`Model request failed: ${response.status}`); state.model=await response.json();
+      const requestedView=params.get('view'); if(['plan','elevation','model','systems','code','assumptions'].includes(requestedView))state.view=requestedView;
+      const requestedLevel=params.get('level'); state.levelId=state.model.levels.some(level=>level.id===requestedLevel)?requestedLevel:(state.model.levels[0]?.id??null); state.findings=validateModel(state.model);
+      document.querySelector('#project-name').textContent=state.model.project.name; document.querySelector('#project-meta').textContent=`${state.model.project.status} · ${state.model.project.coordinates.displayUnits}`; levelSelect.innerHTML=state.model.levels.map(level=>`<option value="${escapeHtml(level.id)}"${level.id===state.levelId?' selected':''}>${escapeHtml(level.name)}</option>`).join(''); document.querySelectorAll('.tab').forEach(tab=>tab.setAttribute('aria-selected',String(tab.dataset.view===state.view))); wireControls(); render();
+    } catch(error) {
+      inspector.innerHTML=`<span class="kicker">Load error</span><h2>Model unavailable</h2><p class="lede">${escapeHtml(error instanceof Error?error.message:String(error))}</p><div class="disclaimer">Expected a schema-valid model at <code>models/building.json</code>. The studio will not invent fallback geometry.</div>`;
+    }
+  }
+  start();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://open-design.ai/schemas/concept-code-findings.v1.json",
+  "title": "Concept Architecture Advisory Code Findings",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "projectId", "jurisdiction", "status", "researchedAt", "findings", "coverage"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "projectId": { "type": "string", "minLength": 1 },
+    "jurisdiction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["country", "stateOrRegion", "locality"],
+      "properties": {
+        "country": { "type": "string" },
+        "stateOrRegion": { "type": "string" },
+        "county": { "type": "string" },
+        "locality": { "type": "string" }
+      }
+    },
+    "status": { "enum": ["researched", "needs-review", "unavailable"] },
+    "researchedAt": { "type": "string", "format": "date-time" },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checked", "potentialConflicts", "unresolved", "outOfScope"],
+      "properties": {
+        "checked": { "type": "array", "items": { "type": "string" } },
+        "potentialConflicts": { "type": "array", "items": { "type": "string" } },
+        "unresolved": { "type": "array", "items": { "type": "string" } },
+        "outOfScope": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "disclaimer": {
+      "const": "Advisory concept review only; no code-compliance claim is made."
+    }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "topic",
+        "authority",
+        "sourceTitle",
+        "sourceRef",
+        "accessedDate",
+        "summary",
+        "applicability",
+        "affectedEntityIds",
+        "confidence",
+        "status"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "topic": { "type": "string" },
+        "authority": { "type": "string" },
+        "sourceTitle": { "type": "string" },
+        "sourceRef": { "type": "string" },
+        "editionOrAdoptionDate": { "type": "string" },
+        "accessedDate": { "type": "string", "format": "date" },
+        "summary": { "type": "string" },
+        "applicability": { "type": "string" },
+        "affectedEntityIds": { "type": "array", "items": { "type": "string" } },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "status": { "enum": ["verified", "needs-review", "unavailable"] },
+        "check": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["parameter", "operator", "threshold", "unit", "result"],
+          "properties": {
+            "parameter": { "type": "string" },
+            "operator": { "enum": [">=", ">", "<=", "<", "="] },
+            "threshold": { "type": "number" },
+            "unit": { "enum": ["mm", "square-mm", "degrees", "count"] },
+            "result": { "enum": ["no-conflict-found", "potential-conflict", "not-evaluated"] }
+          }
+        }
+      }
+    }
+  }
+}

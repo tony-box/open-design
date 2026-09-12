@@ -1,0 +1,377 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://open-design.ai/schemas/concept-building.v1.json",
+  "title": "Concept Architecture Building Model",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "project",
+    "levels",
+    "spaces",
+    "walls",
+    "openings",
+    "slabs",
+    "roofs",
+    "stairs",
+    "fixtures",
+    "equipment",
+    "systems",
+    "assumptions"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "status", "coordinates", "jurisdiction"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["study", "selected-concept", "archived"] },
+        "description": { "type": "string" },
+        "coordinates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["unit", "origin", "siteDatumMm", "trueNorthDeg", "toleranceMm", "displayUnits"],
+          "properties": {
+            "unit": { "const": "mm" },
+            "origin": { "$ref": "#/$defs/point3" },
+            "siteDatumMm": { "type": "integer" },
+            "trueNorthDeg": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
+            "toleranceMm": { "type": "integer", "minimum": 1, "default": 3 },
+            "displayUnits": { "enum": ["feet-inches", "metric"] }
+          }
+        },
+        "jurisdiction": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["country", "stateOrRegion", "locality", "codeReviewStatus"],
+          "properties": {
+            "country": { "type": "string", "minLength": 2 },
+            "stateOrRegion": { "type": "string" },
+            "county": { "type": "string" },
+            "locality": { "type": "string" },
+            "codeReviewStatus": { "enum": ["not-started", "researched", "needs-review", "unavailable"] }
+          }
+        }
+      }
+    },
+    "levels": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/level" }
+    },
+    "spaces": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/space" }
+    },
+    "walls": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/wall" }
+    },
+    "openings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/opening" }
+    },
+    "slabs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/slab" }
+    },
+    "roofs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/roof" }
+    },
+    "stairs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/stair" }
+    },
+    "fixtures": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/placedObject" }
+    },
+    "equipment": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/placedObject" }
+    },
+    "systems": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/system" }
+    },
+    "dimensions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/dimension" },
+      "default": []
+    },
+    "sections": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/section" },
+      "default": []
+    },
+    "viewpoints": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/viewpoint" },
+      "default": []
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/assumption" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "point2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "integer" },
+        "y": { "type": "integer" }
+      }
+    },
+    "point3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "type": "integer" },
+        "y": { "type": "integer" },
+        "z": { "type": "integer" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "confidence", "status", "note"],
+      "properties": {
+        "source": { "enum": ["user", "attachment", "code-source", "heuristic", "generated"] },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "status": { "enum": ["accepted", "needs-review", "rejected"] },
+        "note": { "type": "string" },
+        "reference": { "type": "string" }
+      }
+    },
+    "polygon": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "$ref": "#/$defs/point2" }
+    },
+    "level": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "elevationMm", "evidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "elevationMm": { "type": "integer" },
+        "floorToFloorMm": { "type": "integer", "minimum": 1 },
+        "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    },
+    "space": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "levelId", "use", "boundary", "evidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "levelId": { "$ref": "#/$defs/id" },
+        "use": { "type": "string" },
+        "occupancy": { "type": "integer", "minimum": 0 },
+        "boundary": { "$ref": "#/$defs/polygon" },
+        "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    },
+    "wall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "levelId", "start", "end", "thicknessMm", "heightMm", "kind", "evidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "levelId": { "$ref": "#/$defs/id" },
+        "start": { "$ref": "#/$defs/point2" },
+        "end": { "$ref": "#/$defs/point2" },
+        "thicknessMm": { "type": "integer", "minimum": 1 },
+        "heightMm": { "type": "integer", "minimum": 1 },
+        "baseOffsetMm": { "type": "integer", "default": 0 },
+        "kind": { "enum": ["exterior", "interior", "service", "railing"] },
+        "material": { "type": "string" },
+        "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    },
+    "opening": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "wallId", "kind", "offsetMm", "widthMm", "heightMm", "sillMm", "evidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "wallId": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["door", "window", "overhead-door", "opening"] },
+        "offsetMm": { "type": "integer", "minimum": 0 },
+        "widthMm": { "type": "integer", "minimum": 1 },
+        "heightMm": { "type": "integer", "minimum": 1 },
+        "sillMm": { "type": "integer", "minimum": 0 },
+        "swing": { "enum": ["left", "right", "double", "sliding", "none"] },
+        "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    },
+    "slab": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "levelId", "boundary", "thicknessMm", "evidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "levelId": { "$ref": "#/$defs/id" },
+        "boundary": { "$ref": "#/$defs/polygon" },
+        "thicknessMm": { "type": "integer", "minimum": 1 },
+        "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    },
+    "roof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "levelId", "kind", "footprint", "eaveElevationMm", "ridgeElevationMm", "ridgeAxis", "evidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "levelId": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["flat", "shed", "gable", "gambrel", "hip", "custom"] },
+        "footprint": { "$ref": "#/$defs/polygon" },
+        "eaveElevationMm": { "type": "integer" },
+        "ridgeElevationMm": { "type": "integer" },
+        "ridgeAxis": { "enum": ["x", "y"] },
+        "overhangMm": { "type": "integer", "minimum": 0, "default": 0 },
+        "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    },
+    "stair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "fromLevelId", "toLevelId", "start", "end", "widthMm", "riserCount", "treadDepthMm", "evidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "fromLevelId": { "$ref": "#/$defs/id" },
+        "toLevelId": { "$ref": "#/$defs/id" },
+        "start": { "$ref": "#/$defs/point2" },
+        "end": { "$ref": "#/$defs/point2" },
+        "widthMm": { "type": "integer", "minimum": 1 },
+        "riserCount": { "type": "integer", "minimum": 1 },
+        "treadDepthMm": { "type": "integer", "minimum": 1 },
+        "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    },
+    "placedObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "kind", "levelId", "position", "rotationDeg", "size", "evidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "kind": { "type": "string" },
+        "levelId": { "$ref": "#/$defs/id" },
+        "position": { "$ref": "#/$defs/point3" },
+        "rotationDeg": { "type": "number" },
+        "size": { "$ref": "#/$defs/point3" },
+        "connections": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" },
+          "default": []
+        },
+        "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    },
+    "systemNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "position", "evidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "type": "string" },
+        "position": { "$ref": "#/$defs/point3" },
+        "levelId": { "$ref": "#/$defs/id" },
+        "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    },
+    "systemEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to", "path", "evidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "from": { "$ref": "#/$defs/id" },
+        "to": { "$ref": "#/$defs/id" },
+        "path": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/point3" }
+        },
+        "nominalSize": { "type": "string" },
+        "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    },
+    "system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "discipline", "name", "status", "nodes", "edges", "evidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "discipline": { "enum": ["plumbing", "electrical", "mechanical"] },
+        "name": { "type": "string" },
+        "status": { "enum": ["concept", "needs-review", "unavailable"] },
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/systemNode" } },
+        "edges": { "type": "array", "items": { "$ref": "#/$defs/systemEdge" } },
+        "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    },
+    "dimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "from", "to"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["aligned", "horizontal", "vertical", "elevation"] },
+        "from": { "$ref": "#/$defs/point3" },
+        "to": { "$ref": "#/$defs/point3" },
+        "offsetMm": { "type": "integer", "default": 0 }
+      }
+    },
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "start", "end", "lookDirection"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "start": { "$ref": "#/$defs/point2" },
+        "end": { "$ref": "#/$defs/point2" },
+        "lookDirection": { "enum": ["left", "right"] }
+      }
+    },
+    "viewpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "position", "target"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "position": { "$ref": "#/$defs/point3" },
+        "target": { "$ref": "#/$defs/point3" }
+      }
+    },
+    "assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "topic", "statement", "impact", "evidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "topic": { "type": "string" },
+        "statement": { "type": "string" },
+        "impact": { "enum": ["low", "medium", "high"] },
+        "affectedEntityIds": { "type": "array", "items": { "$ref": "#/$defs/id" }, "default": [] },
+        "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    }
+  }
+}

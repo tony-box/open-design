@@ -1,0 +1,592 @@
+{
+  "schemaVersion": "1.0.0",
+  "project": {
+    "id": "lakeside-barn-residence",
+    "name": "Lakeside Barn Residence Study",
+    "status": "selected-concept",
+    "description": "Synthetic two-level workshop and residence used to test cross-view concept consistency.",
+    "coordinates": {
+      "unit": "mm",
+      "origin": { "x": 0, "y": 0, "z": 0 },
+      "siteDatumMm": 0,
+      "trueNorthDeg": 18,
+      "toleranceMm": 3,
+      "displayUnits": "feet-inches"
+    },
+    "jurisdiction": {
+      "country": "US",
+      "stateOrRegion": "New York",
+      "county": "Example County",
+      "locality": "Example Township",
+      "codeReviewStatus": "needs-review"
+    }
+  },
+  "levels": [
+    {
+      "id": "level-ground",
+      "name": "Ground Floor",
+      "elevationMm": 0,
+      "floorToFloorMm": 3900,
+      "evidence": {
+        "source": "generated",
+        "confidence": 1,
+        "status": "accepted",
+        "note": "Synthetic fixture datum."
+      }
+    },
+    {
+      "id": "level-upper",
+      "name": "Upper Floor",
+      "elevationMm": 3900,
+      "floorToFloorMm": 3100,
+      "evidence": {
+        "source": "generated",
+        "confidence": 1,
+        "status": "accepted",
+        "note": "Synthetic fixture datum."
+      }
+    }
+  ],
+  "spaces": [
+    {
+      "id": "space-workshop",
+      "name": "Workshop",
+      "levelId": "level-ground",
+      "use": "vehicle and fabrication workshop",
+      "occupancy": 4,
+      "boundary": [
+        { "x": 0, "y": 0 },
+        { "x": 9600, "y": 0 },
+        { "x": 9600, "y": 9000 },
+        { "x": 0, "y": 9000 }
+      ],
+      "evidence": {
+        "source": "generated",
+        "confidence": 1,
+        "status": "accepted",
+        "note": "Synthetic regression room."
+      }
+    },
+    {
+      "id": "space-utility",
+      "name": "Utility Core",
+      "levelId": "level-ground",
+      "use": "utility, washroom, and vertical services",
+      "occupancy": 1,
+      "boundary": [
+        { "x": 0, "y": 9000 },
+        { "x": 3600, "y": 9000 },
+        { "x": 3600, "y": 13200 },
+        { "x": 0, "y": 13200 }
+      ],
+      "evidence": {
+        "source": "generated",
+        "confidence": 1,
+        "status": "accepted",
+        "note": "Synthetic wet and equipment core."
+      }
+    },
+    {
+      "id": "space-entry-stair",
+      "name": "Entry and Stair",
+      "levelId": "level-ground",
+      "use": "entry, storage, and vertical circulation",
+      "occupancy": 3,
+      "boundary": [
+        { "x": 3600, "y": 9000 },
+        { "x": 9600, "y": 9000 },
+        { "x": 9600, "y": 13200 },
+        { "x": 3600, "y": 13200 }
+      ],
+      "evidence": {
+        "source": "generated",
+        "confidence": 1,
+        "status": "accepted",
+        "note": "Synthetic circulation zone."
+      }
+    },
+    {
+      "id": "space-great-room",
+      "name": "Great Room and Kitchen",
+      "levelId": "level-upper",
+      "use": "living, dining, and kitchen",
+      "occupancy": 8,
+      "boundary": [
+        { "x": 0, "y": 0 },
+        { "x": 9600, "y": 0 },
+        { "x": 9600, "y": 7600 },
+        { "x": 0, "y": 7600 }
+      ],
+      "evidence": {
+        "source": "generated",
+        "confidence": 1,
+        "status": "accepted",
+        "note": "Synthetic open living zone."
+      }
+    },
+    {
+      "id": "space-bedroom",
+      "name": "Bedroom",
+      "levelId": "level-upper",
+      "use": "sleeping",
+      "occupancy": 2,
+      "boundary": [
+        { "x": 0, "y": 7600 },
+        { "x": 4800, "y": 7600 },
+        { "x": 4800, "y": 13200 },
+        { "x": 0, "y": 13200 }
+      ],
+      "evidence": {
+        "source": "generated",
+        "confidence": 1,
+        "status": "accepted",
+        "note": "Synthetic sleeping zone."
+      }
+    },
+    {
+      "id": "space-bath",
+      "name": "Bath and Laundry",
+      "levelId": "level-upper",
+      "use": "bathroom and laundry",
+      "occupancy": 2,
+      "boundary": [
+        { "x": 4800, "y": 7600 },
+        { "x": 9600, "y": 7600 },
+        { "x": 9600, "y": 13200 },
+        { "x": 4800, "y": 13200 }
+      ],
+      "evidence": {
+        "source": "generated",
+        "confidence": 1,
+        "status": "accepted",
+        "note": "Synthetic upper wet zone aligned near the utility core."
+      }
+    }
+  ],
+  "walls": [
+    {
+      "id": "wall-g-north",
+      "levelId": "level-ground",
+      "start": { "x": 0, "y": 0 },
+      "end": { "x": 9600, "y": 0 },
+      "thicknessMm": 200,
+      "heightMm": 3700,
+      "kind": "exterior",
+      "material": "insulated post-frame wall",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic exterior wall." }
+    },
+    {
+      "id": "wall-g-east",
+      "levelId": "level-ground",
+      "start": { "x": 9600, "y": 0 },
+      "end": { "x": 9600, "y": 13200 },
+      "thicknessMm": 200,
+      "heightMm": 3700,
+      "kind": "exterior",
+      "material": "insulated post-frame wall",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic exterior wall." }
+    },
+    {
+      "id": "wall-g-south",
+      "levelId": "level-ground",
+      "start": { "x": 9600, "y": 13200 },
+      "end": { "x": 0, "y": 13200 },
+      "thicknessMm": 200,
+      "heightMm": 3700,
+      "kind": "exterior",
+      "material": "insulated post-frame wall",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic exterior wall." }
+    },
+    {
+      "id": "wall-g-west",
+      "levelId": "level-ground",
+      "start": { "x": 0, "y": 13200 },
+      "end": { "x": 0, "y": 0 },
+      "thicknessMm": 200,
+      "heightMm": 3700,
+      "kind": "exterior",
+      "material": "insulated post-frame wall",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic exterior wall." }
+    },
+    {
+      "id": "wall-g-core",
+      "levelId": "level-ground",
+      "start": { "x": 0, "y": 9000 },
+      "end": { "x": 9600, "y": 9000 },
+      "thicknessMm": 140,
+      "heightMm": 3000,
+      "kind": "interior",
+      "material": "wood stud partition",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic service-core partition." }
+    },
+    {
+      "id": "wall-g-entry",
+      "levelId": "level-ground",
+      "start": { "x": 3600, "y": 9000 },
+      "end": { "x": 3600, "y": 13200 },
+      "thicknessMm": 140,
+      "heightMm": 3000,
+      "kind": "interior",
+      "material": "wood stud partition",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic utility partition." }
+    },
+    {
+      "id": "wall-u-north",
+      "levelId": "level-upper",
+      "start": { "x": 0, "y": 0 },
+      "end": { "x": 9600, "y": 0 },
+      "thicknessMm": 200,
+      "heightMm": 3000,
+      "kind": "exterior",
+      "material": "insulated framed wall",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic upper exterior wall." }
+    },
+    {
+      "id": "wall-u-east",
+      "levelId": "level-upper",
+      "start": { "x": 9600, "y": 0 },
+      "end": { "x": 9600, "y": 13200 },
+      "thicknessMm": 200,
+      "heightMm": 3000,
+      "kind": "exterior",
+      "material": "insulated framed wall",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic upper exterior wall." }
+    },
+    {
+      "id": "wall-u-south",
+      "levelId": "level-upper",
+      "start": { "x": 9600, "y": 13200 },
+      "end": { "x": 0, "y": 13200 },
+      "thicknessMm": 200,
+      "heightMm": 3000,
+      "kind": "exterior",
+      "material": "insulated framed wall",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic upper exterior wall." }
+    },
+    {
+      "id": "wall-u-west",
+      "levelId": "level-upper",
+      "start": { "x": 0, "y": 13200 },
+      "end": { "x": 0, "y": 0 },
+      "thicknessMm": 200,
+      "heightMm": 3000,
+      "kind": "exterior",
+      "material": "insulated framed wall",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic upper exterior wall." }
+    },
+    {
+      "id": "wall-u-bedrooms",
+      "levelId": "level-upper",
+      "start": { "x": 0, "y": 7600 },
+      "end": { "x": 9600, "y": 7600 },
+      "thicknessMm": 140,
+      "heightMm": 2800,
+      "kind": "interior",
+      "material": "wood stud partition",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic private-zone partition." }
+    },
+    {
+      "id": "wall-u-bath",
+      "levelId": "level-upper",
+      "start": { "x": 4800, "y": 7600 },
+      "end": { "x": 4800, "y": 13200 },
+      "thicknessMm": 140,
+      "heightMm": 2800,
+      "kind": "interior",
+      "material": "wood stud partition",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic bath partition." }
+    }
+  ],
+  "openings": [
+    {
+      "id": "opening-overhead-west",
+      "wallId": "wall-g-north",
+      "kind": "overhead-door",
+      "offsetMm": 700,
+      "widthMm": 3200,
+      "heightMm": 3000,
+      "sillMm": 0,
+      "swing": "none",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic workshop opening." }
+    },
+    {
+      "id": "opening-overhead-east",
+      "wallId": "wall-g-north",
+      "kind": "overhead-door",
+      "offsetMm": 5000,
+      "widthMm": 3200,
+      "heightMm": 3000,
+      "sillMm": 0,
+      "swing": "none",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic workshop opening." }
+    },
+    {
+      "id": "opening-entry",
+      "wallId": "wall-g-east",
+      "kind": "door",
+      "offsetMm": 10300,
+      "widthMm": 1000,
+      "heightMm": 2100,
+      "sillMm": 0,
+      "swing": "left",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic entry door." }
+    },
+    {
+      "id": "opening-core-door",
+      "wallId": "wall-g-core",
+      "kind": "door",
+      "offsetMm": 4100,
+      "widthMm": 1000,
+      "heightMm": 2100,
+      "sillMm": 0,
+      "swing": "right",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic interior door." }
+    },
+    {
+      "id": "opening-upper-north",
+      "wallId": "wall-u-north",
+      "kind": "window",
+      "offsetMm": 3500,
+      "widthMm": 2600,
+      "heightMm": 1600,
+      "sillMm": 800,
+      "swing": "none",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic great-room window." }
+    },
+    {
+      "id": "opening-bedroom-window",
+      "wallId": "wall-u-south",
+      "kind": "window",
+      "offsetMm": 5600,
+      "widthMm": 1800,
+      "heightMm": 1400,
+      "sillMm": 850,
+      "swing": "none",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic bedroom window; egress properties remain unverified." }
+    },
+    {
+      "id": "opening-bath-door",
+      "wallId": "wall-u-bedrooms",
+      "kind": "door",
+      "offsetMm": 6500,
+      "widthMm": 900,
+      "heightMm": 2100,
+      "sillMm": 0,
+      "swing": "right",
+      "evidence": { "source": "generated", "confidence": 1, "status": "accepted", "note": "Synthetic bathroom door." }
+    }
+  ],
+  "slabs": [
+    {
+      "id": "slab-ground",
+      "levelId": "level-ground",
+      "boundary": [
+        { "x": 0, "y": 0 }, { "x": 9600, "y": 0 },
+        { "x": 9600, "y": 13200 }, { "x": 0, "y": 13200 }
+      ],
+      "thicknessMm": 150,
+      "evidence": { "source": "generated", "confidence": 0.7, "status": "needs-review", "note": "Concept slab only; foundation design excluded." }
+    },
+    {
+      "id": "slab-upper",
+      "levelId": "level-upper",
+      "boundary": [
+        { "x": 0, "y": 0 }, { "x": 9600, "y": 0 },
+        { "x": 9600, "y": 13200 }, { "x": 0, "y": 13200 }
+      ],
+      "thicknessMm": 300,
+      "evidence": { "source": "generated", "confidence": 0.65, "status": "needs-review", "note": "Depth is a visual allowance, not a structural assembly." }
+    }
+  ],
+  "roofs": [
+    {
+      "id": "roof-main",
+      "levelId": "level-upper",
+      "kind": "gable",
+      "footprint": [
+        { "x": 0, "y": 0 }, { "x": 9600, "y": 0 },
+        { "x": 9600, "y": 13200 }, { "x": 0, "y": 13200 }
+      ],
+      "eaveElevationMm": 6900,
+      "ridgeElevationMm": 9000,
+      "ridgeAxis": "y",
+      "overhangMm": 450,
+      "evidence": { "source": "generated", "confidence": 0.8, "status": "needs-review", "note": "Concept gable envelope; framing and snow loads excluded." }
+    }
+  ],
+  "stairs": [
+    {
+      "id": "stair-main",
+      "fromLevelId": "level-ground",
+      "toLevelId": "level-upper",
+      "start": { "x": 4700, "y": 12200 },
+      "end": { "x": 4700, "y": 7300 },
+      "widthMm": 1100,
+      "riserCount": 23,
+      "treadDepthMm": 260,
+      "evidence": { "source": "generated", "confidence": 0.75, "status": "needs-review", "note": "Concept stair; landing, headroom, guards, and code geometry require verification." }
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "fixture-shop-sink",
+      "name": "Workshop Sink",
+      "kind": "sink",
+      "levelId": "level-ground",
+      "position": { "x": 900, "y": 9800, "z": 0 },
+      "rotationDeg": 90,
+      "size": { "x": 700, "y": 600, "z": 900 },
+      "connections": ["plumbing-sink"],
+      "evidence": { "source": "generated", "confidence": 0.8, "status": "needs-review", "note": "Concept fixture position near service core." }
+    },
+    {
+      "id": "fixture-upper-bath",
+      "name": "Upper Bath Group",
+      "kind": "bath-group",
+      "levelId": "level-upper",
+      "position": { "x": 6900, "y": 10300, "z": 3900 },
+      "rotationDeg": 0,
+      "size": { "x": 2200, "y": 1800, "z": 1200 },
+      "connections": ["plumbing-bath"],
+      "evidence": { "source": "generated", "confidence": 0.75, "status": "needs-review", "note": "Grouped placeholder; fixture clearances need individual review." }
+    },
+    {
+      "id": "fixture-kitchen-sink",
+      "name": "Kitchen Sink",
+      "kind": "sink",
+      "levelId": "level-upper",
+      "position": { "x": 7200, "y": 6200, "z": 3900 },
+      "rotationDeg": 0,
+      "size": { "x": 800, "y": 600, "z": 900 },
+      "connections": ["plumbing-kitchen"],
+      "evidence": { "source": "generated", "confidence": 0.8, "status": "needs-review", "note": "Concept kitchen fixture aligned toward service core." }
+    }
+  ],
+  "equipment": [
+    {
+      "id": "equipment-panel",
+      "name": "Electrical Panel",
+      "kind": "electrical-panel",
+      "levelId": "level-ground",
+      "position": { "x": 700, "y": 11400, "z": 1000 },
+      "rotationDeg": 90,
+      "size": { "x": 200, "y": 800, "z": 1100 },
+      "connections": ["electrical-panel"],
+      "evidence": { "source": "generated", "confidence": 0.7, "status": "needs-review", "note": "Concept only; service and working clearances require code and utility review." }
+    },
+    {
+      "id": "equipment-heat-pump",
+      "name": "Air-source Heat Pump",
+      "kind": "heat-pump",
+      "levelId": "level-ground",
+      "position": { "x": -900, "y": 10800, "z": 0 },
+      "rotationDeg": 90,
+      "size": { "x": 800, "y": 450, "z": 1100 },
+      "connections": ["mechanical-heat-pump"],
+      "evidence": { "source": "generated", "confidence": 0.65, "status": "needs-review", "note": "Concept location; capacity, clearances, condensate, and snow exposure unresolved." }
+    }
+  ],
+  "systems": [
+    {
+      "id": "system-plumbing",
+      "discipline": "plumbing",
+      "name": "Concept Plumbing",
+      "status": "needs-review",
+      "nodes": [
+        { "id": "plumbing-entry", "kind": "water-and-waste-entry", "position": { "x": 0, "y": 10800, "z": 0 }, "levelId": "level-ground", "evidence": { "source": "generated", "confidence": 0.6, "status": "needs-review", "note": "Concept service entry." } },
+        { "id": "plumbing-stack", "kind": "vertical-stack", "position": { "x": 3300, "y": 10100, "z": 0 }, "levelId": "level-ground", "evidence": { "source": "generated", "confidence": 0.75, "status": "needs-review", "note": "Concept stack aligning wet areas." } },
+        { "id": "plumbing-sink", "kind": "fixture-connection", "position": { "x": 900, "y": 9800, "z": 450 }, "levelId": "level-ground", "evidence": { "source": "generated", "confidence": 0.8, "status": "needs-review", "note": "Workshop sink connection." } },
+        { "id": "plumbing-bath", "kind": "fixture-connection", "position": { "x": 6900, "y": 10300, "z": 4350 }, "levelId": "level-upper", "evidence": { "source": "generated", "confidence": 0.7, "status": "needs-review", "note": "Upper bath group connection." } },
+        { "id": "plumbing-kitchen", "kind": "fixture-connection", "position": { "x": 7200, "y": 6200, "z": 4350 }, "levelId": "level-upper", "evidence": { "source": "generated", "confidence": 0.7, "status": "needs-review", "note": "Kitchen connection." } }
+      ],
+      "edges": [
+        { "id": "plumbing-edge-entry-stack", "from": "plumbing-entry", "to": "plumbing-stack", "path": [{ "x": 0, "y": 10800, "z": 300 }, { "x": 3300, "y": 10800, "z": 300 }, { "x": 3300, "y": 10100, "z": 300 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.55, "status": "needs-review", "note": "Concept route; slope and sizing unresolved." } },
+        { "id": "plumbing-edge-sink", "from": "plumbing-stack", "to": "plumbing-sink", "path": [{ "x": 3300, "y": 10100, "z": 400 }, { "x": 900, "y": 10100, "z": 400 }, { "x": 900, "y": 9800, "z": 450 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.6, "status": "needs-review", "note": "Concept branch." } },
+        { "id": "plumbing-edge-bath", "from": "plumbing-stack", "to": "plumbing-bath", "path": [{ "x": 3300, "y": 10100, "z": 400 }, { "x": 3300, "y": 10100, "z": 4350 }, { "x": 6900, "y": 10100, "z": 4350 }, { "x": 6900, "y": 10300, "z": 4350 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.6, "status": "needs-review", "note": "Concept vertical and horizontal route." } },
+        { "id": "plumbing-edge-kitchen", "from": "plumbing-bath", "to": "plumbing-kitchen", "path": [{ "x": 6900, "y": 10300, "z": 4350 }, { "x": 6900, "y": 6200, "z": 4350 }, { "x": 7200, "y": 6200, "z": 4350 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.55, "status": "needs-review", "note": "Concept branch; routing strategy requires plumbing review." } }
+      ],
+      "evidence": { "source": "generated", "confidence": 0.6, "status": "needs-review", "note": "Concept plumbing network only." }
+    },
+    {
+      "id": "system-electrical",
+      "discipline": "electrical",
+      "name": "Concept Electrical",
+      "status": "needs-review",
+      "nodes": [
+        { "id": "electrical-panel", "kind": "panel", "position": { "x": 700, "y": 11400, "z": 1500 }, "levelId": "level-ground", "evidence": { "source": "generated", "confidence": 0.7, "status": "needs-review", "note": "Concept panel." } },
+        { "id": "electrical-shop", "kind": "shop-distribution", "position": { "x": 4800, "y": 4500, "z": 2800 }, "levelId": "level-ground", "evidence": { "source": "generated", "confidence": 0.6, "status": "needs-review", "note": "Concept shop distribution point." } },
+        { "id": "electrical-upper", "kind": "upper-distribution", "position": { "x": 4800, "y": 7600, "z": 6200 }, "levelId": "level-upper", "evidence": { "source": "generated", "confidence": 0.6, "status": "needs-review", "note": "Concept upper distribution point." } }
+      ],
+      "edges": [
+        { "id": "electrical-edge-shop", "from": "electrical-panel", "to": "electrical-shop", "path": [{ "x": 700, "y": 11400, "z": 2800 }, { "x": 4800, "y": 11400, "z": 2800 }, { "x": 4800, "y": 4500, "z": 2800 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.55, "status": "needs-review", "note": "Concept route; loads, conductor, and protection unresolved." } },
+        { "id": "electrical-edge-upper", "from": "electrical-panel", "to": "electrical-upper", "path": [{ "x": 700, "y": 11400, "z": 2800 }, { "x": 700, "y": 7600, "z": 6200 }, { "x": 4800, "y": 7600, "z": 6200 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.55, "status": "needs-review", "note": "Concept riser and distribution path." } }
+      ],
+      "evidence": { "source": "generated", "confidence": 0.6, "status": "needs-review", "note": "Concept electrical network only." }
+    },
+    {
+      "id": "system-mechanical",
+      "discipline": "mechanical",
+      "name": "Concept Mechanical",
+      "status": "needs-review",
+      "nodes": [
+        { "id": "mechanical-heat-pump", "kind": "outdoor-unit", "position": { "x": -900, "y": 10800, "z": 500 }, "levelId": "level-ground", "evidence": { "source": "generated", "confidence": 0.65, "status": "needs-review", "note": "Concept outdoor unit." } },
+        { "id": "mechanical-air-handler", "kind": "air-handler", "position": { "x": 1800, "y": 11100, "z": 2400 }, "levelId": "level-ground", "evidence": { "source": "generated", "confidence": 0.6, "status": "needs-review", "note": "Concept indoor equipment." } },
+        { "id": "mechanical-shop", "kind": "shop-zone", "position": { "x": 4800, "y": 4500, "z": 3200 }, "levelId": "level-ground", "evidence": { "source": "generated", "confidence": 0.55, "status": "needs-review", "note": "Concept shop terminal." } },
+        { "id": "mechanical-upper", "kind": "residential-zone", "position": { "x": 4800, "y": 6000, "z": 6500 }, "levelId": "level-upper", "evidence": { "source": "generated", "confidence": 0.55, "status": "needs-review", "note": "Concept upper terminal." } }
+      ],
+      "edges": [
+        { "id": "mechanical-edge-refrigerant", "from": "mechanical-heat-pump", "to": "mechanical-air-handler", "path": [{ "x": -900, "y": 10800, "z": 500 }, { "x": 1800, "y": 10800, "z": 2400 }, { "x": 1800, "y": 11100, "z": 2400 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.5, "status": "needs-review", "note": "Concept line-set path." } },
+        { "id": "mechanical-edge-shop", "from": "mechanical-air-handler", "to": "mechanical-shop", "path": [{ "x": 1800, "y": 11100, "z": 3200 }, { "x": 4800, "y": 11100, "z": 3200 }, { "x": 4800, "y": 4500, "z": 3200 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.5, "status": "needs-review", "note": "Concept shop supply path." } },
+        { "id": "mechanical-edge-upper", "from": "mechanical-air-handler", "to": "mechanical-upper", "path": [{ "x": 1800, "y": 11100, "z": 3200 }, { "x": 1800, "y": 6000, "z": 6500 }, { "x": 4800, "y": 6000, "z": 6500 }], "nominalSize": "unverified", "evidence": { "source": "generated", "confidence": 0.5, "status": "needs-review", "note": "Concept upper supply path; return path unresolved." } }
+      ],
+      "evidence": { "source": "generated", "confidence": 0.55, "status": "needs-review", "note": "Concept mechanical network only; loads and equipment selection excluded." }
+    }
+  ],
+  "dimensions": [
+    { "id": "dimension-width", "kind": "horizontal", "from": { "x": 0, "y": 0, "z": 0 }, "to": { "x": 9600, "y": 0, "z": 0 }, "offsetMm": -900 },
+    { "id": "dimension-depth", "kind": "vertical", "from": { "x": 9600, "y": 0, "z": 0 }, "to": { "x": 9600, "y": 13200, "z": 0 }, "offsetMm": 900 },
+    { "id": "dimension-ridge", "kind": "elevation", "from": { "x": 0, "y": 0, "z": 0 }, "to": { "x": 0, "y": 0, "z": 9000 }, "offsetMm": -1000 }
+  ],
+  "sections": [
+    { "id": "section-aa", "name": "Transverse Section A-A", "start": { "x": 0, "y": 6600 }, "end": { "x": 9600, "y": 6600 }, "lookDirection": "left" }
+  ],
+  "viewpoints": [
+    { "id": "view-workshop", "name": "Workshop", "position": { "x": 4800, "y": 6500, "z": 1700 }, "target": { "x": 4800, "y": 0, "z": 1700 } },
+    { "id": "view-great-room", "name": "Great Room", "position": { "x": 4800, "y": 6500, "z": 5500 }, "target": { "x": 4800, "y": 1000, "z": 5200 } },
+    { "id": "view-exterior", "name": "Exterior", "position": { "x": 15000, "y": -16000, "z": 9000 }, "target": { "x": 4800, "y": 6600, "z": 3500 } }
+  ],
+  "assumptions": [
+    {
+      "id": "assumption-site",
+      "topic": "site",
+      "statement": "Site geometry, setbacks, grades, utilities, soils, and legal boundaries are not based on a survey.",
+      "impact": "high",
+      "affectedEntityIds": [],
+      "evidence": { "source": "generated", "confidence": 1, "status": "needs-review", "note": "Fixture intentionally excludes survey data." }
+    },
+    {
+      "id": "assumption-structure",
+      "topic": "structure",
+      "statement": "Wall, slab, floor, stair, and roof dimensions express a spatial envelope only; member sizes and connections are unresolved.",
+      "impact": "high",
+      "affectedEntityIds": ["slab-ground", "slab-upper", "roof-main", "stair-main"],
+      "evidence": { "source": "generated", "confidence": 1, "status": "needs-review", "note": "Professional structural design required." }
+    },
+    {
+      "id": "assumption-code",
+      "topic": "code",
+      "statement": "The fictional jurisdiction has not been researched; all code-sensitive geometry remains advisory.",
+      "impact": "high",
+      "affectedEntityIds": ["stair-main", "opening-bedroom-window", "equipment-panel"],
+      "evidence": { "source": "generated", "confidence": 1, "status": "needs-review", "note": "No official code source applies to this synthetic locality." }
+    },
+    {
+      "id": "assumption-mep",
+      "topic": "mep",
+      "statement": "System paths coordinate space only; loads, sizes, slopes, capacities, protection, and penetrations are unresolved.",
+      "impact": "high",
+      "affectedEntityIds": ["system-plumbing", "system-electrical", "system-mechanical"],
+      "evidence": { "source": "generated", "confidence": 1, "status": "needs-review", "note": "Licensed trade design required." }
+    }
+  ]
+}
